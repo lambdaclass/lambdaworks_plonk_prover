@@ -10,7 +10,7 @@ use std::marker::PhantomData;
 use crate::prover::Proof;
 use crate::setup::{new_strong_fiat_shamir_transcript, CommonPreprocessedInput, VerificationKey};
 
-struct Verifier<F: IsField, CS: IsCommitmentScheme<F>> {
+pub struct Verifier<F: IsField, CS: IsCommitmentScheme<F>> {
     commitment_scheme: CS,
     phantom: PhantomData<F>,
 }
@@ -64,7 +64,7 @@ impl<F: IsField, CS: IsCommitmentScheme<F>> Verifier<F, CS> {
     }
 
     #[allow(unused)]
-    fn verify(
+    pub fn verify(
         &self,
         p: &Proof<F, CS>,
         public_input: &[FieldElement<F>],
