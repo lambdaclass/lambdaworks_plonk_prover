@@ -80,11 +80,6 @@ impl<F: IsField, CS: IsCommitmentScheme<F>> Verifier<F, CS> {
         // TODO: First three steps are validations: belonging to main subgroup, belonging to prime field.
         let [beta, gamma, alpha, zeta, upsilon] = self.compute_challenges(p, vk, public_input);
         let zh_zeta = zeta.pow(input.n) - FieldElement::one();
-        let mut p_pi_y = public_input.to_vec();
-        p_pi_y.append(&mut vec![
-            FieldElement::zero();
-            input.n - public_input.len()
-        ]);
 
         let k1 = &input.k1;
         let k2 = k1 * k1;
@@ -92,9 +87,22 @@ impl<F: IsField, CS: IsCommitmentScheme<F>> Verifier<F, CS> {
         let l1_zeta = (zeta.pow(input.n as u64) - FieldElement::one())
             / (&zeta - FieldElement::one())
             / FieldElement::from(input.n as u64);
-        let p_pi_zeta = Polynomial::interpolate(&input.domain, &p_pi_y)
-            .expect("xs and ys have equal length and xs are unique")
-            .evaluate(&zeta);
+
+        let p_pi_zeta = {
+            if public_input.len() == 0 {
+                FieldElement::zero()
+            } else {
+                let mut p_pi_zeta = &l1_zeta * &public_input[0];
+                let mut li_zeta = l1_zeta.clone();
+                for (i, value) in public_input.iter().enumerate().skip(1) {
+                    li_zeta = &input.omega
+                        * &li_zeta
+                        * ((&zeta - &input.domain[i - 1]) / (&zeta - &input.domain[i]));
+                    p_pi_zeta = &p_pi_zeta + value * &li_zeta;
+                }
+                p_pi_zeta
+            }
+        };
 
         let mut p_constant_zeta = &alpha
             * &p.z_zeta_omega
