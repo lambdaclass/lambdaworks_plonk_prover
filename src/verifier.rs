@@ -88,6 +88,10 @@ impl<F: IsField, CS: IsCommitmentScheme<F>> Verifier<F, CS> {
             / (&zeta - FieldElement::one())
             / FieldElement::from(input.n as u64);
 
+        // Use the following equality to compute PI(ζ)
+        // without interpolating:
+        // Lᵢ₊₁ = ω Lᵢ (X − ωⁱ) / (X − ωⁱ⁺¹)
+        // Here Lᵢ is the i-th polynomial of the Lagrange basis.
         let p_pi_zeta = {
             if public_input.len() == 0 {
                 FieldElement::zero()
