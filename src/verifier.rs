@@ -92,20 +92,18 @@ impl<F: IsField, CS: IsCommitmentScheme<F>> Verifier<F, CS> {
         // without interpolating:
         // Lᵢ₊₁ = ω Lᵢ (X − ωⁱ) / (X − ωⁱ⁺¹)
         // Here Lᵢ is the i-th polynomial of the Lagrange basis.
-        let p_pi_zeta = {
-            if public_input.len() == 0 {
-                FieldElement::zero()
-            } else {
-                let mut p_pi_zeta = &l1_zeta * &public_input[0];
-                let mut li_zeta = l1_zeta.clone();
-                for (i, value) in public_input.iter().enumerate().skip(1) {
-                    li_zeta = &input.omega
-                        * &li_zeta
-                        * ((&zeta - &input.domain[i - 1]) / (&zeta - &input.domain[i]));
-                    p_pi_zeta = &p_pi_zeta + value * &li_zeta;
-                }
-                p_pi_zeta
+        let p_pi_zeta = if public_input.is_empty() {
+            FieldElement::zero()
+        } else {
+            let mut p_pi_zeta = &l1_zeta * &public_input[0];
+            let mut li_zeta = l1_zeta.clone();
+            for (i, value) in public_input.iter().enumerate().skip(1) {
+                li_zeta = &input.omega
+                    * &li_zeta
+                    * ((&zeta - &input.domain[i - 1]) / (&zeta - &input.domain[i]));
+                p_pi_zeta = &p_pi_zeta + value * &li_zeta;
             }
+            p_pi_zeta
         };
 
         let mut p_constant_zeta = &alpha
