@@ -13,6 +13,7 @@ pub struct Witness<F: IsField> {
 }
 
 // TODO: implement getters
+#[derive(Clone)]
 pub struct CommonPreprocessedInput<F: IsField> {
     pub n: usize,
     /// Number of constraints
