@@ -1,8 +1,8 @@
 use super::utils::{
     generate_domain, generate_permutation_coefficients, ORDER_R_MINUS_1_ROOT_UNITY,
 };
-use lambdaworks_math::fft::polynomial::FFTPoly;
 use crate::setup::{CommonPreprocessedInput, Witness};
+use lambdaworks_math::fft::polynomial::FFTPoly;
 use lambdaworks_math::{
     elliptic_curve::short_weierstrass::curves::bls12_381::default_types::{FrElement, FrField},
     field::{element::FieldElement, traits::IsFFTField},
@@ -36,55 +36,44 @@ pub fn test_common_preprocessed_input_1() -> CommonPreprocessedInput<FrField> {
         domain: domain.clone(),
         k1: ORDER_R_MINUS_1_ROOT_UNITY,
         // domain: domain.clone(),
-
-        ql: Polynomial::interpolate_fft(
-            &[
-                -FieldElement::one(),
-                -FieldElement::one(),
-                FieldElement::zero(),
-                FieldElement::one(),
-            ],
-        )
+        ql: Polynomial::interpolate_fft(&[
+            -FieldElement::one(),
+            -FieldElement::one(),
+            FieldElement::zero(),
+            FieldElement::one(),
+        ])
         .unwrap(),
 
-        qr: Polynomial::interpolate_fft(
-            &[
-                FieldElement::zero(),
-                FieldElement::zero(),
-                FieldElement::zero(),
-                -FieldElement::one(),
-            ],
-        )
+        qr: Polynomial::interpolate_fft(&[
+            FieldElement::zero(),
+            FieldElement::zero(),
+            FieldElement::zero(),
+            -FieldElement::one(),
+        ])
         .unwrap(),
 
-        qo: Polynomial::interpolate_fft(
-            &[
-                FieldElement::zero(),
-                FieldElement::zero(),
-                -FieldElement::one(),
-                FieldElement::zero(),
-            ],
-        )
+        qo: Polynomial::interpolate_fft(&[
+            FieldElement::zero(),
+            FieldElement::zero(),
+            -FieldElement::one(),
+            FieldElement::zero(),
+        ])
         .unwrap(),
 
-        qm: Polynomial::interpolate_fft(
-            &[
-                FieldElement::zero(),
-                FieldElement::zero(),
-                FieldElement::one(),
-                FieldElement::zero(),
-            ],
-        )
+        qm: Polynomial::interpolate_fft(&[
+            FieldElement::zero(),
+            FieldElement::zero(),
+            FieldElement::one(),
+            FieldElement::zero(),
+        ])
         .unwrap(),
 
-        qc: Polynomial::interpolate_fft(
-            &[
-                FieldElement::from(0_u64),
-                FieldElement::from(0_u64),
-                FieldElement::zero(),
-                FieldElement::zero(),
-            ],
-        )
+        qc: Polynomial::interpolate_fft(&[
+            FieldElement::from(0_u64),
+            FieldElement::from(0_u64),
+            FieldElement::zero(),
+            FieldElement::zero(),
+        ])
         .unwrap(),
 
         s1: Polynomial::interpolate_fft(&s1_lagrange).unwrap(),

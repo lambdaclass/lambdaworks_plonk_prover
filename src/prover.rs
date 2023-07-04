@@ -1,6 +1,6 @@
 use lambdaworks_crypto::fiat_shamir::transcript::Transcript;
-use lambdaworks_math::field::traits::IsFFTField;
 use lambdaworks_math::fft::polynomial::FFTPoly;
+use lambdaworks_math::field::traits::IsFFTField;
 use lambdaworks_math::traits::{IsRandomFieldElementGenerator, Serializable};
 use std::marker::PhantomData;
 
@@ -161,8 +161,6 @@ where
         witness: &Witness<F>,
         common_preprocessed_input: &CommonPreprocessedInput<F>,
     ) -> Round1Result<F, CS::Commitment> {
-        let domain = &common_preprocessed_input.domain;
-
         let p_a = Polynomial::interpolate_fft(&witness.a)
             .expect("xs and ys have equal length and xs are unique");
         let p_b = Polynomial::interpolate_fft(&witness.b)
