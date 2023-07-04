@@ -214,7 +214,7 @@ where
             coefficients.push(new_term);
         }
 
-        let p_z = Polynomial::interpolate(&cpi.domain, &coefficients)
+        let p_z = Polynomial::interpolate_fft(&coefficients)
             .expect("xs and ys have equal length and xs are unique");
         let z_h = Polynomial::new_monomial(FieldElement::one(), common_preprocessed_input.n)
             - FieldElement::one();
