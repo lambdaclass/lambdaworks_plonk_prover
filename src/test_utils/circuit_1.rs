@@ -1,10 +1,11 @@
 use super::utils::{
     generate_domain, generate_permutation_coefficients, ORDER_R_MINUS_1_ROOT_UNITY,
 };
+use lambdaworks_math::fft::polynomial::FFTPoly;
 use crate::setup::{CommonPreprocessedInput, Witness};
 use lambdaworks_math::{
     elliptic_curve::short_weierstrass::curves::bls12_381::default_types::{FrElement, FrField},
-    field::element::FieldElement,
+    field::{element::FieldElement, traits::IsFFTField},
     polynomial::Polynomial,
 };
 
@@ -19,8 +20,8 @@ pub const ORDER_4_ROOT_UNITY: FrElement =
     assert y == z
 */
 pub fn test_common_preprocessed_input_1() -> CommonPreprocessedInput<FrField> {
-    let n: usize = 4;
-    let omega = ORDER_4_ROOT_UNITY;
+    let n = 4;
+    let omega = FrField::get_primitive_root_of_unity(2).unwrap();
     let domain = generate_domain(&omega, n);
     let permuted =
         generate_permutation_coefficients(&omega, n, &[11, 3, 0, 1, 2, 4, 6, 10, 5, 8, 7, 9]);
@@ -32,11 +33,11 @@ pub fn test_common_preprocessed_input_1() -> CommonPreprocessedInput<FrField> {
     CommonPreprocessedInput {
         n,
         omega,
-        k1: ORDER_R_MINUS_1_ROOT_UNITY,
         domain: domain.clone(),
+        k1: ORDER_R_MINUS_1_ROOT_UNITY,
+        // domain: domain.clone(),
 
-        ql: Polynomial::interpolate(
-            &domain,
+        ql: Polynomial::interpolate_fft(
             &[
                 -FieldElement::one(),
                 -FieldElement::one(),
@@ -46,8 +47,7 @@ pub fn test_common_preprocessed_input_1() -> CommonPreprocessedInput<FrField> {
         )
         .unwrap(),
 
-        qr: Polynomial::interpolate(
-            &domain,
+        qr: Polynomial::interpolate_fft(
             &[
                 FieldElement::zero(),
                 FieldElement::zero(),
@@ -57,8 +57,7 @@ pub fn test_common_preprocessed_input_1() -> CommonPreprocessedInput<FrField> {
         )
         .unwrap(),
 
-        qo: Polynomial::interpolate(
-            &domain,
+        qo: Polynomial::interpolate_fft(
             &[
                 FieldElement::zero(),
                 FieldElement::zero(),
@@ -68,8 +67,7 @@ pub fn test_common_preprocessed_input_1() -> CommonPreprocessedInput<FrField> {
         )
         .unwrap(),
 
-        qm: Polynomial::interpolate(
-            &domain,
+        qm: Polynomial::interpolate_fft(
             &[
                 FieldElement::zero(),
                 FieldElement::zero(),
@@ -79,8 +77,7 @@ pub fn test_common_preprocessed_input_1() -> CommonPreprocessedInput<FrField> {
         )
         .unwrap(),
 
-        qc: Polynomial::interpolate(
-            &domain,
+        qc: Polynomial::interpolate_fft(
             &[
                 FieldElement::from(0_u64),
                 FieldElement::from(0_u64),
@@ -90,9 +87,9 @@ pub fn test_common_preprocessed_input_1() -> CommonPreprocessedInput<FrField> {
         )
         .unwrap(),
 
-        s1: Polynomial::interpolate(&domain, &s1_lagrange).unwrap(),
-        s2: Polynomial::interpolate(&domain, &s2_lagrange).unwrap(),
-        s3: Polynomial::interpolate(&domain, &s3_lagrange).unwrap(),
+        s1: Polynomial::interpolate_fft(&s1_lagrange).unwrap(),
+        s2: Polynomial::interpolate_fft(&s2_lagrange).unwrap(),
+        s3: Polynomial::interpolate_fft(&s3_lagrange).unwrap(),
 
         s1_lagrange,
         s2_lagrange,

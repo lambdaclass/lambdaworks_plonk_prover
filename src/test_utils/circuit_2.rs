@@ -4,7 +4,7 @@ use super::utils::{
 use crate::setup::{CommonPreprocessedInput, Witness};
 use lambdaworks_math::{
     elliptic_curve::short_weierstrass::curves::bls12_381::default_types::{FrElement, FrField},
-    field::element::FieldElement,
+    field::{element::FieldElement, traits::IsFFTField},
     polynomial::Polynomial,
 };
 
@@ -22,7 +22,7 @@ pub const ORDER_8_ROOT_UNITY: FrElement = FrElement::from_hex_unchecked(
 */
 pub fn test_common_preprocessed_input_2() -> CommonPreprocessedInput<FrField> {
     let n: usize = 8;
-    let omega = ORDER_8_ROOT_UNITY;
+    let omega = FrField::get_primitive_root_of_unity(3).unwrap();
     let domain = generate_domain(&omega, n);
     let permutation = &[
         23, 4, 0, 18, 1, 2, 5, 6, 7, 8, 10, 9, 19, 11, 13, 14, 15, 16, 3, 12, 17, 20, 21, 22,
