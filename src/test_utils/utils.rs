@@ -23,8 +23,8 @@ pub type Pairing = BLS12381AtePairing;
 pub type KZG = KateZaveruchaGoldberg<FrField, Pairing>;
 pub const ORDER_R_MINUS_1_ROOT_UNITY: FrElement = FrElement::from_hex_unchecked("7");
 
-type G1Point = <BLS12381Curve as IsEllipticCurve>::PointRepresentation;
-type G2Point = <BLS12381TwistCurve as IsEllipticCurve>::PointRepresentation;
+pub type G1Point = <BLS12381Curve as IsEllipticCurve>::PointRepresentation;
+pub type G2Point = <BLS12381TwistCurve as IsEllipticCurve>::PointRepresentation;
 
 /// Generates a test SRS for the BLS12381 curve
 /// n is the number of constraints in the system.
@@ -78,6 +78,7 @@ fn identity_permutation(w: &FrElement, n: usize) -> Vec<FrElement> {
 /// A mock of a random number generator, to have deterministic tests.
 /// When set to zero, there is no zero knowledge applied, because it is used
 /// to get random numbers to blind polynomials.
+#[derive(Clone)]
 pub struct TestRandomFieldGenerator;
 impl IsRandomFieldElementGenerator<FrField> for TestRandomFieldGenerator {
     fn generate(&self) -> FrElement {
