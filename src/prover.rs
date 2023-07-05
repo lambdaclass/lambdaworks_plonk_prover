@@ -2,9 +2,7 @@ use lambdaworks_crypto::fiat_shamir::transcript::Transcript;
 use lambdaworks_math::fft::polynomial::FFTPoly;
 use lambdaworks_math::field::traits::IsFFTField;
 use lambdaworks_math::traits::{IsRandomFieldElementGenerator, Serializable};
-use std::cmp::max;
 use std::marker::PhantomData;
-use std::time::Instant;
 
 use crate::setup::{
     new_strong_fiat_shamir_transcript, CommonPreprocessedInput, VerificationKey, Witness,
@@ -266,6 +264,7 @@ where
         // Compute p
         // To leverage FFT we work with the evaluation form of every polynomial
         // involved
+        // TODO: check a factor of 4 is a sensible upper bound
         let degree = 4 * cpi.n;
         let offset = &cpi.k1;
         let p_a_eval = p_a.evaluate_offset_fft(1, Some(degree), offset).unwrap();
@@ -349,12 +348,10 @@ where
 
         let a = p_eval;
 
-        let mut b = zh
-            .evaluate_offset_fft(1, Some(degree), &offset)
-            .unwrap();
+        let mut b = zh.evaluate_offset_fft(1, Some(degree), offset).unwrap();
         FieldElement::inplace_batch_inverse(&mut b);
         let c: Vec<_> = a.iter().zip(b.iter()).map(|(aa, bb)| aa * bb).collect();
-        let mut t = Polynomial::interpolate_offset_fft(&c, &offset).unwrap();
+        let mut t = Polynomial::interpolate_offset_fft(&c, offset).unwrap();
 
         Polynomial::pad_with_zero_coefficients_to_length(&mut t, 3 * (&cpi.n + 2));
         let p_t_lo = Polynomial::new(&t.coefficients[..&cpi.n + 2]);

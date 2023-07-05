@@ -54,7 +54,7 @@ pub fn common_preprocessed_input_from_json(
         },
         CommonPreprocessedInput {
             n,
-            domain: domain.clone(),
+            domain,
             omega,
             k1: ORDER_R_MINUS_1_ROOT_UNITY,
             ql: Polynomial::interpolate_fft(&process_vector(json_input.Ql, &FrElement::zero(), n))
