@@ -1,4 +1,6 @@
 use lambdaworks_crypto::fiat_shamir::transcript::Transcript;
+use lambdaworks_math::fft::polynomial::FFTPoly;
+use lambdaworks_math::field::traits::IsFFTField;
 use lambdaworks_math::traits::{IsRandomFieldElementGenerator, Serializable};
 use std::marker::PhantomData;
 
@@ -124,7 +126,7 @@ struct Round5Result<F: IsField, Hiding> {
 
 impl<F, CS, R> Prover<F, CS, R>
 where
-    F: IsField,
+    F: IsField + IsFFTField,
     CS: IsCommitmentScheme<F>,
     FieldElement<F>: ByteConversion,
     CS::Commitment: Serializable,
@@ -159,13 +161,11 @@ where
         witness: &Witness<F>,
         common_preprocessed_input: &CommonPreprocessedInput<F>,
     ) -> Round1Result<F, CS::Commitment> {
-        let domain = &common_preprocessed_input.domain;
-
-        let p_a = Polynomial::interpolate(domain, &witness.a)
+        let p_a = Polynomial::interpolate_fft(&witness.a)
             .expect("xs and ys have equal length and xs are unique");
-        let p_b = Polynomial::interpolate(domain, &witness.b)
+        let p_b = Polynomial::interpolate_fft(&witness.b)
             .expect("xs and ys have equal length and xs are unique");
-        let p_c = Polynomial::interpolate(domain, &witness.c)
+        let p_c = Polynomial::interpolate_fft(&witness.c)
             .expect("xs and ys have equal length and xs are unique");
 
         let z_h = Polynomial::new_monomial(FieldElement::one(), common_preprocessed_input.n)
@@ -214,7 +214,7 @@ where
             coefficients.push(new_term);
         }
 
-        let p_z = Polynomial::interpolate(&cpi.domain, &coefficients)
+        let p_z = Polynomial::interpolate_fft(&coefficients)
             .expect("xs and ys have equal length and xs are unique");
         let z_h = Polynomial::new_monomial(FieldElement::one(), common_preprocessed_input.n)
             - FieldElement::one();

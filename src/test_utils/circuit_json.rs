@@ -2,6 +2,7 @@ use super::utils::{
     generate_domain, generate_permutation_coefficients, ORDER_R_MINUS_1_ROOT_UNITY,
 };
 use crate::setup::{CommonPreprocessedInput, Witness};
+use lambdaworks_math::fft::polynomial::FFTPoly;
 use lambdaworks_math::{
     elliptic_curve::short_weierstrass::curves::bls12_381::default_types::{FrElement, FrField},
     polynomial::Polynomial,
@@ -56,34 +57,19 @@ pub fn common_preprocessed_input_from_json(
             domain: domain.clone(),
             omega,
             k1: ORDER_R_MINUS_1_ROOT_UNITY,
-            ql: Polynomial::interpolate(
-                &domain,
-                &process_vector(json_input.Ql, &FrElement::zero(), n),
-            )
-            .unwrap(),
-            qr: Polynomial::interpolate(
-                &domain,
-                &process_vector(json_input.Qr, &FrElement::zero(), n),
-            )
-            .unwrap(),
-            qo: Polynomial::interpolate(
-                &domain,
-                &process_vector(json_input.Qo, &FrElement::zero(), n),
-            )
-            .unwrap(),
-            qm: Polynomial::interpolate(
-                &domain,
-                &process_vector(json_input.Qm, &FrElement::zero(), n),
-            )
-            .unwrap(),
-            qc: Polynomial::interpolate(
-                &domain,
-                &process_vector(json_input.Qc, &FrElement::zero(), n),
-            )
-            .unwrap(),
-            s1: Polynomial::interpolate(&domain, &s1_lagrange).unwrap(),
-            s2: Polynomial::interpolate(&domain, &s2_lagrange).unwrap(),
-            s3: Polynomial::interpolate(&domain, &s3_lagrange).unwrap(),
+            ql: Polynomial::interpolate_fft(&process_vector(json_input.Ql, &FrElement::zero(), n))
+                .unwrap(),
+            qr: Polynomial::interpolate_fft(&process_vector(json_input.Qr, &FrElement::zero(), n))
+                .unwrap(),
+            qo: Polynomial::interpolate_fft(&process_vector(json_input.Qo, &FrElement::zero(), n))
+                .unwrap(),
+            qm: Polynomial::interpolate_fft(&process_vector(json_input.Qm, &FrElement::zero(), n))
+                .unwrap(),
+            qc: Polynomial::interpolate_fft(&process_vector(json_input.Qc, &FrElement::zero(), n))
+                .unwrap(),
+            s1: Polynomial::interpolate_fft(&s1_lagrange).unwrap(),
+            s2: Polynomial::interpolate_fft(&s2_lagrange).unwrap(),
+            s3: Polynomial::interpolate_fft(&s3_lagrange).unwrap(),
             s1_lagrange,
             s2_lagrange,
             s3_lagrange,
