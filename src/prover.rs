@@ -346,11 +346,13 @@ where
             .map(|((p2, p1), co)| (p2 * &alpha + p1) * &alpha + co)
             .collect();
 
-        let a = p_eval;
-
-        let mut b = zh.evaluate_offset_fft(1, Some(degree), offset).unwrap();
-        FieldElement::inplace_batch_inverse(&mut b);
-        let c: Vec<_> = a.iter().zip(b.iter()).map(|(aa, bb)| aa * bb).collect();
+        let mut zh_eval = zh.evaluate_offset_fft(1, Some(degree), offset).unwrap();
+        FieldElement::inplace_batch_inverse(&mut zh_eval);
+        let c: Vec<_> = p_eval
+            .iter()
+            .zip(zh_eval.iter())
+            .map(|(a, b)| a * b)
+            .collect();
         let mut t = Polynomial::interpolate_offset_fft(&c, offset).unwrap();
 
         Polynomial::pad_with_zero_coefficients_to_length(&mut t, 3 * (&cpi.n + 2));
