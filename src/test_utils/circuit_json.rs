@@ -3,6 +3,7 @@ use super::utils::{
 };
 use crate::setup::{CommonPreprocessedInput, Witness};
 use lambdaworks_math::fft::polynomial::FFTPoly;
+use lambdaworks_math::field::traits::IsFFTField;
 use lambdaworks_math::{
     elliptic_curve::short_weierstrass::curves::bls12_381::default_types::{FrElement, FrField},
     polynomial::Polynomial,
@@ -14,8 +15,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize)]
 struct JsonPlonkCircuit {
     N: usize,
-    Omega: String,
-    N_padded: usize,
+    N_Padded: usize,
     Input: Vec<String>,
     Ql: Vec<String>,
     Qr: Vec<String>,
@@ -36,8 +36,8 @@ pub fn common_preprocessed_input_from_json(
     Vec<FrElement>,
 ) {
     let json_input: JsonPlonkCircuit = serde_json::from_str(json_string).unwrap();
-    let n = json_input.N_padded;
-    let omega = FrElement::from_hex_unchecked(&json_input.Omega);
+    let n = json_input.N_Padded;
+    let omega = FrField::get_primitive_root_of_unity(n.trailing_zeros() as u64).unwrap();
     let domain = generate_domain(&omega, n);
     let permuted = generate_permutation_coefficients(&omega, n, &json_input.Permutation);
 
@@ -54,7 +54,7 @@ pub fn common_preprocessed_input_from_json(
         },
         CommonPreprocessedInput {
             n,
-            domain: domain.clone(),
+            domain,
             omega,
             k1: ORDER_R_MINUS_1_ROOT_UNITY,
             ql: Polynomial::interpolate_fft(&process_vector(json_input.Ql, &FrElement::zero(), n))
@@ -106,7 +106,7 @@ mod tests {
         common_preprocessed_input_from_json(
             r#"{
  "N": 4,
- "N_padded": 4,
+ "N_Padded": 4,
  "Omega": "8d51ccce760304d0ec030002760300000001000000000000",
   "Input": [
   "2",

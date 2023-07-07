@@ -33,7 +33,7 @@ pub fn test_common_preprocessed_input_1() -> CommonPreprocessedInput<FrField> {
     CommonPreprocessedInput {
         n,
         omega,
-        domain: domain.clone(),
+        domain,
         k1: ORDER_R_MINUS_1_ROOT_UNITY,
         // domain: domain.clone(),
         ql: Polynomial::interpolate_fft(&[

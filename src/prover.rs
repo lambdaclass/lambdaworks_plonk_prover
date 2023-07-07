@@ -254,27 +254,106 @@ where
         let z_x_omega = Polynomial::new(&z_x_omega_coefficients);
         let mut e1 = vec![FieldElement::zero(); cpi.domain.len()];
         e1[0] = FieldElement::one();
-        let l1 = Polynomial::interpolate(&cpi.domain, &e1)
+        let l1 = Polynomial::interpolate_fft(&e1)
             .expect("xs and ys have equal length and xs are unique");
         let mut p_pi_y = public_input.to_vec();
         p_pi_y.append(&mut vec![FieldElement::zero(); cpi.n - public_input.len()]);
-        let p_pi = Polynomial::interpolate(&cpi.domain, &p_pi_y)
+        let p_pi = Polynomial::interpolate_fft(&p_pi_y)
             .expect("xs and ys have equal length and xs are unique");
 
-        let p_constraints =
-            p_a * p_b * &cpi.qm + p_a * &cpi.ql + p_b * &cpi.qr + p_c * &cpi.qo + &cpi.qc + p_pi;
-        let f = (p_a + p_x * beta + gamma)
-            * (p_b + p_x * beta * &cpi.k1 + gamma)
-            * (p_c + p_x * beta * k2 + gamma);
-        let g = (p_a + &cpi.s1 * beta + gamma)
-            * (p_b + &cpi.s2 * beta + gamma)
-            * (p_c + &cpi.s3 * beta + gamma);
-        let p_permutation_1 = g * z_x_omega - f * p_z;
-        let p_permutation_2 = (p_z - one) * &l1;
+        // Compute p
+        // To leverage FFT we work with the evaluation form of every polynomial
+        // involved
+        // TODO: check a factor of 4 is a sensible upper bound
+        let degree = 4 * cpi.n;
+        let offset = &cpi.k1;
+        let p_a_eval = p_a.evaluate_offset_fft(1, Some(degree), offset).unwrap();
+        let p_b_eval = p_b.evaluate_offset_fft(1, Some(degree), offset).unwrap();
+        let p_c_eval = p_c.evaluate_offset_fft(1, Some(degree), offset).unwrap();
+        let ql_eval = cpi.ql.evaluate_offset_fft(1, Some(degree), offset).unwrap();
+        let qr_eval = cpi.qr.evaluate_offset_fft(1, Some(degree), offset).unwrap();
+        let qm_eval = cpi.qm.evaluate_offset_fft(1, Some(degree), offset).unwrap();
+        let qo_eval = cpi.qo.evaluate_offset_fft(1, Some(degree), offset).unwrap();
+        let qc_eval = cpi.qc.evaluate_offset_fft(1, Some(degree), offset).unwrap();
+        let p_pi_eval = p_pi.evaluate_offset_fft(1, Some(degree), offset).unwrap();
+        let p_x_eval = p_x.evaluate_offset_fft(1, Some(degree), offset).unwrap();
+        let p_z_eval = p_z.evaluate_offset_fft(1, Some(degree), offset).unwrap();
+        let p_z_x_omega_eval = z_x_omega
+            .evaluate_offset_fft(1, Some(degree), offset)
+            .unwrap();
+        let p_s1_eval = cpi.s1.evaluate_offset_fft(1, Some(degree), offset).unwrap();
+        let p_s2_eval = cpi.s2.evaluate_offset_fft(1, Some(degree), offset).unwrap();
+        let p_s3_eval = cpi.s3.evaluate_offset_fft(1, Some(degree), offset).unwrap();
+        let l1_eval = l1.evaluate_offset_fft(1, Some(degree), offset).unwrap();
 
-        let p = ((&p_permutation_2 * &alpha) + p_permutation_1) * &alpha + p_constraints;
+        let p_constraints_eval: Vec<_> = p_a_eval
+            .iter()
+            .zip(p_b_eval.iter())
+            .zip(p_c_eval.iter())
+            .zip(ql_eval.iter())
+            .zip(qr_eval.iter())
+            .zip(qm_eval.iter())
+            .zip(qo_eval.iter())
+            .zip(qc_eval.iter())
+            .zip(p_pi_eval.iter())
+            .map(|((((((((a, b), c), ql), qr), qm), qo), qc), pi)| {
+                a * b * qm + a * ql + b * qr + c * qo + qc + pi
+            })
+            .collect();
 
-        let mut t = p / zh;
+        let f_eval: Vec<_> = p_a_eval
+            .iter()
+            .zip(p_b_eval.iter())
+            .zip(p_c_eval.iter())
+            .zip(p_x_eval.iter())
+            .map(|(((a, b), c), x)| {
+                (a + x * beta + gamma)
+                    * (b + x * beta * &cpi.k1 + gamma)
+                    * (c + x * beta * &k2 + gamma)
+            })
+            .collect();
+
+        let g_eval: Vec<_> = p_a_eval
+            .iter()
+            .zip(p_b_eval.iter())
+            .zip(p_c_eval.iter())
+            .zip(p_s1_eval.iter())
+            .zip(p_s2_eval.iter())
+            .zip(p_s3_eval.iter())
+            .map(|(((((a, b), c), s1), s2), s3)| {
+                (a + s1 * beta + gamma) * (b + s2 * beta + gamma) * (c + s3 * beta + gamma)
+            })
+            .collect();
+
+        let p_permutation_1_eval: Vec<_> = g_eval
+            .iter()
+            .zip(f_eval.iter())
+            .zip(p_z_eval.iter())
+            .zip(p_z_x_omega_eval.iter())
+            .map(|(((g, f), z), y)| g * y - f * z)
+            .collect();
+
+        let p_permutation_2_eval: Vec<_> = p_z_eval
+            .iter()
+            .zip(l1_eval.iter())
+            .map(|(z, l)| (z - FieldElement::one()) * l)
+            .collect();
+
+        let p_eval: Vec<_> = p_permutation_2_eval
+            .iter()
+            .zip(p_permutation_1_eval.iter())
+            .zip(p_constraints_eval.iter())
+            .map(|((p2, p1), co)| (p2 * &alpha + p1) * &alpha + co)
+            .collect();
+
+        let mut zh_eval = zh.evaluate_offset_fft(1, Some(degree), offset).unwrap();
+        FieldElement::inplace_batch_inverse(&mut zh_eval);
+        let c: Vec<_> = p_eval
+            .iter()
+            .zip(zh_eval.iter())
+            .map(|(a, b)| a * b)
+            .collect();
+        let mut t = Polynomial::interpolate_offset_fft(&c, offset).unwrap();
 
         Polynomial::pad_with_zero_coefficients_to_length(&mut t, 3 * (&cpi.n + 2));
         let p_t_lo = Polynomial::new(&t.coefficients[..&cpi.n + 2]);
