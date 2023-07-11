@@ -127,7 +127,6 @@ where
 
 fn deserialize_field_element<F>(
     bytes: &[u8],
-    separator_size: usize,
     offset: usize,
 ) -> Result<(usize, FieldElement<F>), DeserializationError>
 where
@@ -135,19 +134,24 @@ where
     FieldElement<F>: ByteConversion,
 {
     let mut offset = offset;
-    let element_size_bytes: [u8; size_of::<usize>()] = bytes[offset..offset + separator_size]
+    let element_size_bytes: [u8; size_of::<usize>()] = bytes
+        .get(offset..offset + size_of::<usize>())
+        .ok_or(DeserializationError::InvalidAmountOfBytes)?
         .try_into()
         .map_err(|_| DeserializationError::InvalidAmountOfBytes)?;
     let element_size = usize::from_be_bytes(element_size_bytes);
-    offset += separator_size;
-    let field_element = FieldElement::from_bytes_be(&bytes[offset..offset + element_size])?;
+    offset += size_of::<usize>();
+    let field_element = FieldElement::from_bytes_be(
+        bytes
+            .get(offset..offset + element_size)
+            .ok_or(DeserializationError::InvalidAmountOfBytes)?,
+    )?;
     offset += element_size;
     Ok((offset, field_element))
 }
 
 fn deserialize_commitment<F, CS>(
     bytes: &[u8],
-    separator_size: usize,
     offset: usize,
 ) -> Result<(usize, CS::Commitment), DeserializationError>
 where
@@ -156,12 +160,18 @@ where
     CS::Commitment: Deserializable,
 {
     let mut offset = offset;
-    let element_size_bytes: [u8; size_of::<usize>()] = bytes[offset..offset + separator_size]
+    let element_size_bytes: [u8; size_of::<usize>()] = bytes
+        .get(offset..offset + size_of::<usize>())
+        .ok_or(DeserializationError::InvalidAmountOfBytes)?
         .try_into()
         .map_err(|_| DeserializationError::InvalidAmountOfBytes)?;
     let element_size = usize::from_be_bytes(element_size_bytes);
-    offset += separator_size;
-    let commitment = CS::Commitment::deserialize(&bytes[offset..offset + element_size])?;
+    offset += size_of::<usize>();
+    let commitment = CS::Commitment::deserialize(
+        bytes
+            .get(offset..offset + element_size)
+            .ok_or(DeserializationError::InvalidAmountOfBytes)?,
+    )?;
     offset += element_size;
     Ok((offset, commitment))
 }
@@ -177,27 +187,24 @@ where
     where
         Self: Sized,
     {
-        let separator_size = size_of::<usize>();
+        let (offset, a_zeta) = deserialize_field_element(bytes, 0)?;
+        let (offset, b_zeta) = deserialize_field_element(bytes, offset)?;
+        let (offset, c_zeta) = deserialize_field_element(bytes, offset)?;
+        let (offset, s1_zeta) = deserialize_field_element(bytes, offset)?;
+        let (offset, s2_zeta) = deserialize_field_element(bytes, offset)?;
+        let (offset, z_zeta_omega) = deserialize_field_element(bytes, offset)?;
+        let (offset, p_non_constant_zeta) = deserialize_field_element(bytes, offset)?;
+        let (offset, t_zeta) = deserialize_field_element(bytes, offset)?;
 
-        let (offset, a_zeta) = deserialize_field_element(bytes, separator_size, 0)?;
-        let (offset, b_zeta) = deserialize_field_element(bytes, separator_size, offset)?;
-        let (offset, c_zeta) = deserialize_field_element(bytes, separator_size, offset)?;
-        let (offset, s1_zeta) = deserialize_field_element(bytes, separator_size, offset)?;
-        let (offset, s2_zeta) = deserialize_field_element(bytes, separator_size, offset)?;
-        let (offset, z_zeta_omega) = deserialize_field_element(bytes, separator_size, offset)?;
-        let (offset, p_non_constant_zeta) =
-            deserialize_field_element(bytes, separator_size, offset)?;
-        let (offset, t_zeta) = deserialize_field_element(bytes, separator_size, offset)?;
-
-        let (offset, a_1) = deserialize_commitment::<F, CS>(bytes, separator_size, offset)?;
-        let (offset, b_1) = deserialize_commitment::<F, CS>(bytes, separator_size, offset)?;
-        let (offset, c_1) = deserialize_commitment::<F, CS>(bytes, separator_size, offset)?;
-        let (offset, z_1) = deserialize_commitment::<F, CS>(bytes, separator_size, offset)?;
-        let (offset, t_lo_1) = deserialize_commitment::<F, CS>(bytes, separator_size, offset)?;
-        let (offset, t_mid_1) = deserialize_commitment::<F, CS>(bytes, separator_size, offset)?;
-        let (offset, t_hi_1) = deserialize_commitment::<F, CS>(bytes, separator_size, offset)?;
-        let (offset, w_zeta_1) = deserialize_commitment::<F, CS>(bytes, separator_size, offset)?;
-        let (_, w_zeta_omega_1) = deserialize_commitment::<F, CS>(bytes, separator_size, offset)?;
+        let (offset, a_1) = deserialize_commitment::<F, CS>(bytes, offset)?;
+        let (offset, b_1) = deserialize_commitment::<F, CS>(bytes, offset)?;
+        let (offset, c_1) = deserialize_commitment::<F, CS>(bytes, offset)?;
+        let (offset, z_1) = deserialize_commitment::<F, CS>(bytes, offset)?;
+        let (offset, t_lo_1) = deserialize_commitment::<F, CS>(bytes, offset)?;
+        let (offset, t_mid_1) = deserialize_commitment::<F, CS>(bytes, offset)?;
+        let (offset, t_hi_1) = deserialize_commitment::<F, CS>(bytes, offset)?;
+        let (offset, w_zeta_1) = deserialize_commitment::<F, CS>(bytes, offset)?;
+        let (_, w_zeta_omega_1) = deserialize_commitment::<F, CS>(bytes, offset)?;
 
         Ok(Proof {
             a_1,
