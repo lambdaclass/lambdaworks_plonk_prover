@@ -1,8 +1,10 @@
 use lambdaworks_crypto::fiat_shamir::transcript::Transcript;
+use lambdaworks_math::errors::DeserializationError;
 use lambdaworks_math::fft::polynomial::FFTPoly;
 use lambdaworks_math::field::traits::IsFFTField;
-use lambdaworks_math::traits::{IsRandomFieldElementGenerator, Serializable};
+use lambdaworks_math::traits::{Deserializable, IsRandomFieldElementGenerator, Serializable};
 use std::marker::PhantomData;
+use std::mem::size_of;
 
 use crate::setup::{
     new_strong_fiat_shamir_transcript, CommonPreprocessedInput, VerificationKey, Witness,
@@ -73,6 +75,150 @@ pub struct Proof<F: IsField, CS: IsCommitmentScheme<F>> {
     pub w_zeta_1: CS::Commitment,
     /// Single opening proof for `z(ζω)`.
     pub w_zeta_omega_1: CS::Commitment,
+}
+
+impl<F, CS> Serializable for Proof<F, CS>
+where
+    F: IsField,
+    CS: IsCommitmentScheme<F>,
+    FieldElement<F>: ByteConversion,
+    CS::Commitment: Serializable,
+{
+    fn serialize(&self) -> Vec<u8> {
+        let field_elements = vec![
+            &self.a_zeta,
+            &self.b_zeta,
+            &self.c_zeta,
+            &self.s1_zeta,
+            &self.s2_zeta,
+            &self.z_zeta_omega,
+            &self.p_non_constant_zeta,
+            &self.t_zeta,
+        ];
+        let commitments = vec![
+            &self.a_1,
+            &self.b_1,
+            &self.c_1,
+            &self.z_1,
+            &self.t_lo_1,
+            &self.t_mid_1,
+            &self.t_hi_1,
+            &self.w_zeta_1,
+            &self.w_zeta_omega_1,
+        ];
+
+        let mut serialized_proof: Vec<u8> = Vec::new();
+
+        field_elements.iter().for_each(|element| {
+            let serialized_element = element.to_bytes_be();
+            serialized_proof.extend_from_slice(&serialized_element.len().to_be_bytes());
+            serialized_proof.extend_from_slice(&serialized_element);
+        });
+
+        commitments.iter().for_each(|commitment| {
+            let serialized_commitment = commitment.serialize();
+            serialized_proof.extend_from_slice(&serialized_commitment.len().to_be_bytes());
+            serialized_proof.extend_from_slice(&serialized_commitment);
+        });
+
+        serialized_proof
+    }
+}
+
+fn deserialize_field_element<F>(
+    bytes: &[u8],
+    separator_size: usize,
+    offset: usize,
+) -> Result<(usize, FieldElement<F>), DeserializationError>
+where
+    F: IsField,
+    FieldElement<F>: ByteConversion,
+{
+    let mut offset = offset;
+    let element_size_bytes: [u8; size_of::<usize>()] = bytes[offset..offset + separator_size]
+        .try_into()
+        .map_err(|_| DeserializationError::InvalidAmountOfBytes)?;
+    let element_size = usize::from_be_bytes(element_size_bytes);
+    offset += separator_size;
+    let field_element = FieldElement::from_bytes_be(&bytes[offset..offset + element_size])?;
+    offset += element_size;
+    Ok((offset, field_element))
+}
+
+fn deserialize_commitment<F, CS>(
+    bytes: &[u8],
+    separator_size: usize,
+    offset: usize,
+) -> Result<(usize, CS::Commitment), DeserializationError>
+where
+    F: IsField,
+    CS: IsCommitmentScheme<F>,
+    CS::Commitment: Deserializable,
+{
+    let mut offset = offset;
+    let element_size_bytes: [u8; size_of::<usize>()] = bytes[offset..offset + separator_size]
+        .try_into()
+        .map_err(|_| DeserializationError::InvalidAmountOfBytes)?;
+    let element_size = usize::from_be_bytes(element_size_bytes);
+    offset += separator_size;
+    let commitment = CS::Commitment::deserialize(&bytes[offset..offset + element_size])?;
+    offset += element_size;
+    Ok((offset, commitment))
+}
+
+impl<F, CS> Deserializable for Proof<F, CS>
+where
+    F: IsField,
+    CS: IsCommitmentScheme<F>,
+    FieldElement<F>: ByteConversion,
+    CS::Commitment: Deserializable,
+{
+    fn deserialize(bytes: &[u8]) -> Result<Self, DeserializationError>
+    where
+        Self: Sized,
+    {
+        let separator_size = size_of::<usize>();
+
+        let (offset, a_zeta) = deserialize_field_element(bytes, separator_size, 0)?;
+        let (offset, b_zeta) = deserialize_field_element(bytes, separator_size, offset)?;
+        let (offset, c_zeta) = deserialize_field_element(bytes, separator_size, offset)?;
+        let (offset, s1_zeta) = deserialize_field_element(bytes, separator_size, offset)?;
+        let (offset, s2_zeta) = deserialize_field_element(bytes, separator_size, offset)?;
+        let (offset, z_zeta_omega) = deserialize_field_element(bytes, separator_size, offset)?;
+        let (offset, p_non_constant_zeta) =
+            deserialize_field_element(bytes, separator_size, offset)?;
+        let (offset, t_zeta) = deserialize_field_element(bytes, separator_size, offset)?;
+
+        let (offset, a_1) = deserialize_commitment::<F, CS>(bytes, separator_size, offset)?;
+        let (offset, b_1) = deserialize_commitment::<F, CS>(bytes, separator_size, offset)?;
+        let (offset, c_1) = deserialize_commitment::<F, CS>(bytes, separator_size, offset)?;
+        let (offset, z_1) = deserialize_commitment::<F, CS>(bytes, separator_size, offset)?;
+        let (offset, t_lo_1) = deserialize_commitment::<F, CS>(bytes, separator_size, offset)?;
+        let (offset, t_mid_1) = deserialize_commitment::<F, CS>(bytes, separator_size, offset)?;
+        let (offset, t_hi_1) = deserialize_commitment::<F, CS>(bytes, separator_size, offset)?;
+        let (offset, w_zeta_1) = deserialize_commitment::<F, CS>(bytes, separator_size, offset)?;
+        let (_, w_zeta_omega_1) = deserialize_commitment::<F, CS>(bytes, separator_size, offset)?;
+
+        Ok(Proof {
+            a_1,
+            b_1,
+            c_1,
+            z_1,
+            t_lo_1,
+            t_mid_1,
+            t_hi_1,
+            a_zeta,
+            b_zeta,
+            c_zeta,
+            s1_zeta,
+            s2_zeta,
+            z_zeta_omega,
+            p_non_constant_zeta,
+            t_zeta,
+            w_zeta_1,
+            w_zeta_omega_1,
+        })
+    }
 }
 
 pub struct Prover<F: IsField, CS: IsCommitmentScheme<F>, R: IsRandomFieldElementGenerator<F>> {
