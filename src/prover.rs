@@ -150,14 +150,12 @@ where
     Ok((offset, field_element))
 }
 
-fn deserialize_commitment<F, CS>(
+fn deserialize_commitment<Commitment>(
     bytes: &[u8],
     offset: usize,
-) -> Result<(usize, CS::Commitment), DeserializationError>
+) -> Result<(usize, Commitment), DeserializationError>
 where
-    F: IsField,
-    CS: IsCommitmentScheme<F>,
-    CS::Commitment: Deserializable,
+    Commitment: Deserializable,
 {
     let mut offset = offset;
     let element_size_bytes: [u8; size_of::<usize>()] = bytes
@@ -167,7 +165,7 @@ where
         .map_err(|_| DeserializationError::InvalidAmountOfBytes)?;
     let element_size = usize::from_be_bytes(element_size_bytes);
     offset += size_of::<usize>();
-    let commitment = CS::Commitment::deserialize(
+    let commitment = Commitment::deserialize(
         bytes
             .get(offset..offset + element_size)
             .ok_or(DeserializationError::InvalidAmountOfBytes)?,
@@ -196,15 +194,15 @@ where
         let (offset, p_non_constant_zeta) = deserialize_field_element(bytes, offset)?;
         let (offset, t_zeta) = deserialize_field_element(bytes, offset)?;
 
-        let (offset, a_1) = deserialize_commitment::<F, CS>(bytes, offset)?;
-        let (offset, b_1) = deserialize_commitment::<F, CS>(bytes, offset)?;
-        let (offset, c_1) = deserialize_commitment::<F, CS>(bytes, offset)?;
-        let (offset, z_1) = deserialize_commitment::<F, CS>(bytes, offset)?;
-        let (offset, t_lo_1) = deserialize_commitment::<F, CS>(bytes, offset)?;
-        let (offset, t_mid_1) = deserialize_commitment::<F, CS>(bytes, offset)?;
-        let (offset, t_hi_1) = deserialize_commitment::<F, CS>(bytes, offset)?;
-        let (offset, w_zeta_1) = deserialize_commitment::<F, CS>(bytes, offset)?;
-        let (_, w_zeta_omega_1) = deserialize_commitment::<F, CS>(bytes, offset)?;
+        let (offset, a_1) = deserialize_commitment(bytes, offset)?;
+        let (offset, b_1) = deserialize_commitment(bytes, offset)?;
+        let (offset, c_1) = deserialize_commitment(bytes, offset)?;
+        let (offset, z_1) = deserialize_commitment(bytes, offset)?;
+        let (offset, t_lo_1) = deserialize_commitment(bytes, offset)?;
+        let (offset, t_mid_1) = deserialize_commitment(bytes, offset)?;
+        let (offset, t_hi_1) = deserialize_commitment(bytes, offset)?;
+        let (offset, w_zeta_1) = deserialize_commitment(bytes, offset)?;
+        let (_, w_zeta_omega_1) = deserialize_commitment(bytes, offset)?;
 
         Ok(Proof {
             a_1,
