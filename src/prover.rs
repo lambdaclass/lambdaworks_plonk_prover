@@ -111,13 +111,13 @@ where
 
         field_elements.iter().for_each(|element| {
             let serialized_element = element.to_bytes_be();
-            serialized_proof.extend_from_slice(&serialized_element.len().to_be_bytes());
+            serialized_proof.extend_from_slice(&(serialized_element.len() as u32).to_be_bytes());
             serialized_proof.extend_from_slice(&serialized_element);
         });
 
         commitments.iter().for_each(|commitment| {
             let serialized_commitment = commitment.serialize();
-            serialized_proof.extend_from_slice(&serialized_commitment.len().to_be_bytes());
+            serialized_proof.extend_from_slice(&(serialized_commitment.len() as u32).to_be_bytes());
             serialized_proof.extend_from_slice(&serialized_commitment);
         });
 
@@ -125,6 +125,7 @@ where
     }
 }
 
+// TODO: Remove this once FieldElements implement Serializable
 fn deserialize_field_element<F>(
     bytes: &[u8],
     offset: usize,
@@ -134,13 +135,13 @@ where
     FieldElement<F>: ByteConversion,
 {
     let mut offset = offset;
-    let element_size_bytes: [u8; size_of::<usize>()] = bytes
-        .get(offset..offset + size_of::<usize>())
+    let element_size_bytes: [u8; size_of::<u32>()] = bytes
+        .get(offset..offset + size_of::<u32>())
         .ok_or(DeserializationError::InvalidAmountOfBytes)?
         .try_into()
         .map_err(|_| DeserializationError::InvalidAmountOfBytes)?;
-    let element_size = usize::from_be_bytes(element_size_bytes);
-    offset += size_of::<usize>();
+    let element_size = u32::from_be_bytes(element_size_bytes) as usize;
+    offset += size_of::<u32>() as usize;
     let field_element = FieldElement::from_bytes_be(
         bytes
             .get(offset..offset + element_size)
@@ -158,13 +159,13 @@ where
     Commitment: Deserializable,
 {
     let mut offset = offset;
-    let element_size_bytes: [u8; size_of::<usize>()] = bytes
-        .get(offset..offset + size_of::<usize>())
+    let element_size_bytes: [u8; size_of::<u32>()] = bytes
+        .get(offset..offset + size_of::<u32>())
         .ok_or(DeserializationError::InvalidAmountOfBytes)?
         .try_into()
         .map_err(|_| DeserializationError::InvalidAmountOfBytes)?;
-    let element_size = usize::from_be_bytes(element_size_bytes);
-    offset += size_of::<usize>();
+    let element_size = u32::from_be_bytes(element_size_bytes) as usize;
+    offset += size_of::<u32>();
     let commitment = Commitment::deserialize(
         bytes
             .get(offset..offset + element_size)
