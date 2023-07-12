@@ -197,6 +197,8 @@ impl<F: IsField + IsFFTField, CS: IsCommitmentScheme<F>> Verifier<F, CS> {
 
 #[cfg(test)]
 mod tests {
+    use lambdaworks_math::traits::Deserializable;
+
     use super::*;
 
     use crate::{
@@ -375,6 +377,46 @@ mod tests {
         let verifier = Verifier::new(kzg);
         assert!(verifier.verify(
             &proof,
+            &public_input,
+            &common_preprocessed_input,
+            &verifying_key
+        ));
+    }
+
+    #[test]
+    fn test_serialize_proof() {
+        // This is the circuit for x * e == y
+        let common_preprocessed_input = test_common_preprocessed_input_1();
+        let srs = test_srs(common_preprocessed_input.n);
+
+        // Public input
+        let x = FieldElement::from(4_u64);
+        let y = FieldElement::from(12_u64);
+
+        // Private variable
+        let e = FieldElement::from(3_u64);
+
+        let public_input = vec![x.clone(), y];
+        let witness = test_witness_1(x, e);
+
+        let kzg = KZG::new(srs);
+        let verifying_key = setup(&common_preprocessed_input, &kzg);
+        let random_generator = TestRandomFieldGenerator {};
+
+        let prover = Prover::new(kzg.clone(), random_generator);
+        let proof = prover.prove(
+            &witness,
+            &public_input,
+            &common_preprocessed_input,
+            &verifying_key,
+        );
+
+        let serialized_proof = proof.serialize();
+        let deserialized_proof = Proof::deserialize(&serialized_proof).unwrap();
+
+        let verifier = Verifier::new(kzg);
+        assert!(verifier.verify(
+            &deserialized_proof,
             &public_input,
             &common_preprocessed_input,
             &verifying_key
