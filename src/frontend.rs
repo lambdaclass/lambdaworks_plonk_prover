@@ -573,6 +573,33 @@ mod tests {
     }
 
     #[test]
+    fn test_pow() {
+        let constraint_system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let base = Variable::new(constraint_system);
+        let exponent = Variable::new(constraint_system);
+        let exponent_bits = Variable::new_u32(&exponent, constraint_system);
+        let mut result = Variable::new(constraint_system);
+        let result_first_value_id = result.0;
+
+        assert_eq!(exponent_bits.len(), 32);
+        for i in 0..32 {
+            if i != 0 {
+                result = result.mul(&result, constraint_system);
+            }
+            result = Variable::if_else(&exponent_bits[i], &result.mul(&base, constraint_system), &result, constraint_system);
+        }
+        let mut inputs = HashMap::from([
+            (base.0, FieldElement::from(3)),
+            (exponent.0, FieldElement::from(10)),
+            (result_first_value_id, FieldElement::from(1)),
+        ]);
+
+        solver(&constraint_system, &mut inputs).unwrap();
+        assert_eq!(inputs.get(&result.0).unwrap(), &FieldElement::from(59049));
+    }
+
+    #[test]
     fn test_solve_3() {
         let constraint_system = &mut ConstraintSystem::<U64PrimeField<17>>::new();
 
