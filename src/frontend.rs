@@ -310,16 +310,24 @@ impl Variable {
     }
 
     fn if_else<F: IsField>(
+        boolean_condition: &Self,
+        v1: &Self,
+        v2: &Self,
+        constraint_system: &mut ConstraintSystem<F>,
+    ) -> Self {
+        let if_branch = v1.mul(&boolean_condition, constraint_system);
+        let else_branch = v2.mul(&boolean_condition.not(constraint_system), constraint_system);
+        if_branch.add(&else_branch, constraint_system)
+    }
+
+    fn if_neq_else<F: IsField>(
         condition: &Self,
         v1: &Self,
         v2: &Self,
         constraint_system: &mut ConstraintSystem<F>,
     ) -> Self {
         let (is_zero, _) = Self::inv(condition, constraint_system);
-        let not_is_zero = is_zero.not(constraint_system);
-        let if_branch = v1.mul(&not_is_zero, constraint_system);
-        let else_branch = v2.mul(&is_zero, constraint_system);
-        if_branch.add(&else_branch, constraint_system)
+        Self::if_else(&is_zero, v2, v1, constraint_system)
     }
 }
 
@@ -587,7 +595,12 @@ mod tests {
             if i != 0 {
                 result = result.mul(&result, constraint_system);
             }
-            result = Variable::if_else(&exponent_bits[i], &result.mul(&base, constraint_system), &result, constraint_system);
+            result = Variable::if_else(
+                &exponent_bits[i],
+                &result.mul(&base, constraint_system),
+                &result,
+                constraint_system,
+            );
         }
         let mut inputs = HashMap::from([
             (base.0, FieldElement::from(3)),
@@ -597,6 +610,7 @@ mod tests {
 
         solver(&constraint_system, &mut inputs).unwrap();
         assert_eq!(inputs.get(&result.0).unwrap(), &FieldElement::from(59049));
+        println!("{:?}", constraint_system.num_variables);
     }
 
     #[test]
