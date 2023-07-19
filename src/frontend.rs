@@ -452,6 +452,83 @@ fn solver<F: IsField>(
 mod tests {
     use super::*;
     use lambdaworks_math::field::{element::FieldElement, fields::u64_prime_field::U64PrimeField};
+    #[test]
+    fn test_add() {
+        let constraint_system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let input1 = Variable::new(constraint_system);
+        let input2 = Variable::new(constraint_system);
+        let result = input1.add(&input2, constraint_system);
+
+        let a = 3;
+        let b = 10;
+
+        let mut inputs = HashMap::from([
+            (input1.0, FieldElement::from(a)),
+            (input2.0, FieldElement::from(b)),
+        ]);
+
+        solver(&constraint_system, &mut inputs).unwrap();
+        assert_eq!(inputs.get(&result.0).unwrap(), &FieldElement::from(a + b));
+    }
+
+    #[test]
+    fn test_mul() {
+        let constraint_system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let input1 = Variable::new(constraint_system);
+        let input2 = Variable::new(constraint_system);
+        let result = input1.mul(&input2, constraint_system);
+
+        let a = 3;
+        let b = 11;
+
+        let mut inputs = HashMap::from([
+            (input1.0, FieldElement::from(a)),
+            (input2.0, FieldElement::from(b)),
+        ]);
+
+        solver(&constraint_system, &mut inputs).unwrap();
+        assert_eq!(inputs.get(&result.0).unwrap(), &FieldElement::from(a * b));
+    }
+
+    #[test]
+    fn test_div() {
+        let constraint_system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let input1 = Variable::new(constraint_system);
+        let input2 = Variable::new(constraint_system);
+        let result = input1.div(&input2, constraint_system);
+
+        let a = FieldElement::from(3);
+        let b = FieldElement::from(11);
+
+        let mut inputs = HashMap::from([
+            (input1.0, FieldElement::from(a)),
+            (input2.0, FieldElement::from(b)),
+        ]);
+
+        solver(&constraint_system, &mut inputs).unwrap();
+        assert_eq!(inputs.get(&result.0).unwrap(), &(a/b) );
+    }
+
+    #[test]
+    fn test_add_constant() {
+        let constraint_system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let input1 = Variable::new(constraint_system);
+        let b = FieldElement::from(11);
+        let result = input1.add_constant(b.clone(), constraint_system);
+
+        let a = FieldElement::from(3);
+
+        let mut inputs = HashMap::from([
+            (input1.0, FieldElement::from(a)),
+        ]);
+
+        solver(&constraint_system, &mut inputs).unwrap();
+        assert_eq!(inputs.get(&result.0).unwrap(), &(a+b));
+    }
 
     // assert out == if(i1^2 + i1 * i2 + 5 != 0, i1, i2)
     #[test]
@@ -611,24 +688,5 @@ mod tests {
         solver(&constraint_system, &mut inputs).unwrap();
         assert_eq!(inputs.get(&result.0).unwrap(), &FieldElement::from(59049));
         println!("{:?}", constraint_system.num_variables);
-    }
-
-    #[test]
-    fn test_solve_3() {
-        let constraint_system = &mut ConstraintSystem::<U64PrimeField<17>>::new();
-
-        let input1 = Variable::new(constraint_system);
-        let input2 = Variable::new(constraint_system);
-
-        let z = Variable::if_else(&input1, &input1, &input2, constraint_system);
-        let mut inputs = HashMap::from([
-            (0, FieldElement::from(0u64)),
-            (1, FieldElement::from(16u64)),
-        ]);
-
-        solver(&constraint_system, &mut inputs).unwrap();
-
-        // println!("Assignment");
-        // println!("{:?}", inputs);
     }
 }
