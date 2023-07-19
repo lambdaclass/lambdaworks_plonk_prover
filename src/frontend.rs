@@ -1,4 +1,7 @@
-use lambdaworks_math::field::{element::FieldElement, traits::IsField};
+use lambdaworks_math::field::{
+    element::FieldElement,
+    traits::{IsField, IsPrimeField},
+};
 use std::collections::HashMap;
 
 // a Ql + b Qr + a b Qm + c Qo + Qc = 0
@@ -166,6 +169,58 @@ impl Variable {
         boolean
     }
 
+    fn new_u32<F: IsPrimeField>(
+        v: &Variable,
+        constraint_system: &mut ConstraintSystem<F>,
+    ) -> Vec<Self> {
+        let hint = |v: &FieldElement<F>| {
+            if v.representative() & 1.into() == 1.into() {
+                FieldElement::one()
+            } else {
+                FieldElement::zero()
+            }
+        };
+        let bits: Vec<_> = (0..32)
+            .map(|_| Self::new_boolean(constraint_system))
+            .collect();
+        let mut aux_vars: Vec<Variable> = Vec::new();
+
+        let t_0 = Self::new(constraint_system);
+        constraint_system.add_constraint(PlonkConstraint {
+            constraint_type: ConstraintType {
+                ql: FieldElement::from(2),
+                qr: FieldElement::one(),
+                qm: FieldElement::zero(),
+                qo: -FieldElement::one(),
+                qc: FieldElement::zero(),
+            },
+            l: bits[0].0,
+            r: bits[1].0,
+            o: t_0.0,
+            hint: Some((hint, Column::O, Column::R)),
+        });
+        aux_vars.push(t_0);
+        for i in 2..32 {
+            let t_i = Self::new(constraint_system);
+            constraint_system.add_constraint(PlonkConstraint {
+                constraint_type: ConstraintType {
+                    ql: FieldElement::from(2),
+                    qr: FieldElement::one(),
+                    qm: FieldElement::zero(),
+                    qo: -FieldElement::one(),
+                    qc: FieldElement::zero(),
+                },
+                l: aux_vars.last().unwrap().0,
+                r: bits[i].0,
+                o: t_i.0,
+                hint: Some((hint, Column::O, Column::R)),
+            });
+            aux_vars.push(t_i);
+        }
+        Self::assert_eq(v, aux_vars.last().unwrap(), constraint_system);
+        bits
+    }
+
     fn not<F: IsField>(&self, constraint_system: &mut ConstraintSystem<F>) -> Self {
         let result = Self::new(constraint_system);
         constraint_system.add_constraint(PlonkConstraint {
@@ -287,26 +342,32 @@ fn solver<F: IsField>(
                     (Column::L, Column::R, true, false, _) => {
                         assignments
                             .insert(constraint.r, hint(assignments.get(&constraint.l).unwrap()));
+                        number_solved += 1;
                     }
                     (Column::L, Column::O, true, _, false) => {
                         assignments
                             .insert(constraint.o, hint(assignments.get(&constraint.l).unwrap()));
+                        number_solved += 1;
                     }
                     (Column::R, Column::L, false, true, _) => {
                         assignments
                             .insert(constraint.l, hint(assignments.get(&constraint.r).unwrap()));
+                        number_solved += 1;
                     }
                     (Column::R, Column::O, _, true, false) => {
                         assignments
                             .insert(constraint.o, hint(assignments.get(&constraint.r).unwrap()));
+                        number_solved += 1;
                     }
                     (Column::O, Column::L, false, _, true) => {
                         assignments
                             .insert(constraint.l, hint(assignments.get(&constraint.o).unwrap()));
+                        number_solved += 1;
                     }
                     (Column::O, Column::R, _, false, true) => {
                         assignments
                             .insert(constraint.r, hint(assignments.get(&constraint.o).unwrap()));
+                        number_solved += 1;
                     }
                     _ => {}
                 }
@@ -489,6 +550,26 @@ mod tests {
 
         // println!("Assignment");
         // println!("{:?}", inputs);
+    }
+
+    #[test]
+    fn test_solve_u32() {
+        let constraint_system = &mut ConstraintSystem::<U64PrimeField<17>>::new();
+
+        let input = Variable::new(constraint_system);
+        let u32_var = Variable::new_u32(&input, constraint_system);
+
+        let input_assignment = 13;
+        let mut inputs = HashMap::from([(0, FieldElement::from(input_assignment))]);
+
+        solver(&constraint_system, &mut inputs).unwrap();
+
+        for i in 0..32 {
+            assert_eq!(
+                inputs.get(&u32_var[i].0).unwrap().representative(),
+                (input_assignment >> (31 - i)) & 1
+            );
+        }
     }
 
     #[test]
