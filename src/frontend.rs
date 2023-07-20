@@ -151,6 +151,32 @@ impl Variable {
         result
     }
 
+    /// Generates a new variables `v = c1 * v1 + c2 * v2 + b`
+    fn linear_combination<F: IsField>(
+        v1: &Variable,
+        c1: FieldElement<F>,
+        v2: &Variable,
+        c2: FieldElement<F>,
+        bias: FieldElement<F>,
+        constraint_system: &mut ConstraintSystem<F>,
+    ) -> Variable {
+        let result = Self::new(constraint_system);
+        constraint_system.add_constraint(PlonkConstraint {
+            constraint_type: ConstraintType {
+                ql: c1,
+                qr: c2,
+                qm: FieldElement::zero(),
+                qo: -FieldElement::one(),
+                qc: bias,
+            },
+            l: v1.0,
+            r: v2.0,
+            o: result.0,
+            hint: None,
+        });
+        result
+    }
+
     fn new_boolean<F: IsField>(constraint_system: &mut ConstraintSystem<F>) -> Self {
         let boolean = Self::new(constraint_system);
         constraint_system.add_constraint(PlonkConstraint {
@@ -509,7 +535,7 @@ mod tests {
         ]);
 
         solver(&constraint_system, &mut inputs).unwrap();
-        assert_eq!(inputs.get(&result.0).unwrap(), &(a/b) );
+        assert_eq!(inputs.get(&result.0).unwrap(), &(a / b));
     }
 
     #[test]
@@ -522,12 +548,10 @@ mod tests {
 
         let a = FieldElement::from(3);
 
-        let mut inputs = HashMap::from([
-            (input1.0, FieldElement::from(a)),
-        ]);
+        let mut inputs = HashMap::from([(input1.0, FieldElement::from(a))]);
 
         solver(&constraint_system, &mut inputs).unwrap();
-        assert_eq!(inputs.get(&result.0).unwrap(), &(a+b));
+        assert_eq!(inputs.get(&result.0).unwrap(), &(a + b));
     }
 
     // assert out == if(i1^2 + i1 * i2 + 5 != 0, i1, i2)
