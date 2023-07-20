@@ -14,15 +14,23 @@ struct ConstraintType<F: IsField> {
 }
 
 // a Ql + b Qr + a b Qm + c Qo + Qc = 0
+#[derive(Clone)]
 enum Column {
     L,
     R,
     O,
 }
 
+#[derive(Clone)]
+struct Hint<F: IsField> {
+    function: fn(&FieldElement<F>) -> FieldElement<F>,
+    input: Column,
+    output: Column,
+}
+
 struct PlonkConstraint<F: IsField> {
     constraint_type: ConstraintType<F>,
-    hint: Option<(fn(&FieldElement<F>) -> FieldElement<F>, Column, Column)>, // func, input, output
+    hint: Option<Hint<F>>, // func, input, output
     l: usize,
     r: usize,
     o: usize,
@@ -66,26 +74,79 @@ impl Variable {
         Variable(constraint_system.new_wire())
     }
 
+    /// Generates a new variables `v = c1 * v1 + c2 * v2 + b`
+    fn linear_combination<F: IsField>(
+        v1: &Variable,
+        c1: FieldElement<F>,
+        v2: &Variable,
+        c2: FieldElement<F>,
+        b: FieldElement<F>,
+        hint: Option<Hint<F>>,
+        constraint_system: &mut ConstraintSystem<F>,
+    ) -> Variable {
+        let result = Self::new(constraint_system);
+        constraint_system.add_constraint(PlonkConstraint {
+            constraint_type: ConstraintType {
+                ql: c1,
+                qr: c2,
+                qm: FieldElement::zero(),
+                qo: -FieldElement::one(),
+                qc: b,
+            },
+            l: v1.0,
+            r: v2.0,
+            o: result.0,
+            hint: hint,
+        });
+        result
+    }
+
+    /// Generates a new variables `v = c1 * v1 + b`
+    fn linear_function<F: IsField>(
+        v: &Variable,
+        c: FieldElement<F>,
+        b: FieldElement<F>,
+        constraint_system: &mut ConstraintSystem<F>,
+    ) -> Variable {
+        let result = Self::new(constraint_system);
+        constraint_system.add_constraint(PlonkConstraint {
+            constraint_type: ConstraintType {
+                ql: FieldElement::one(),
+                qr: FieldElement::zero(),
+                qm: FieldElement::zero(),
+                qo: -FieldElement::one(),
+                qc: b,
+            },
+            l: v.0,
+            r: constraint_system.empty_wire(),
+            o: result.0,
+            hint: None,
+        });
+        result
+    }
+
     fn add<F: IsField>(
         &self,
         other: &Variable,
         constraint_system: &mut ConstraintSystem<F>,
     ) -> Self {
-        let result = Self::new(constraint_system);
-        constraint_system.add_constraint(PlonkConstraint {
-            constraint_type: ConstraintType {
-                ql: FieldElement::one(),
-                qr: FieldElement::one(),
-                qm: FieldElement::zero(),
-                qo: -FieldElement::one(),
-                qc: FieldElement::zero(),
-            },
-            l: self.0,
-            r: other.0,
-            o: result.0,
-            hint: None,
-        });
-        result
+        Self::linear_combination(
+            self,
+            FieldElement::one(),
+            other,
+            FieldElement::one(),
+            FieldElement::zero(),
+            None,
+            constraint_system,
+        )
+    }
+
+    fn add_constant<F: IsField>(
+        &self,
+        constant: FieldElement<F>,
+        constraint_system: &mut ConstraintSystem<F>,
+    ) -> Self {
+        Self::linear_function(self, FieldElement::one(), constant, constraint_system)
     }
 
     fn mul<F: IsField>(
@@ -129,54 +190,6 @@ impl Variable {
         result
     }
 
-    fn add_constant<F: IsField>(
-        &self,
-        constant: FieldElement<F>,
-        constraint_system: &mut ConstraintSystem<F>,
-    ) -> Self {
-        let result = Self::new(constraint_system);
-        constraint_system.add_constraint(PlonkConstraint {
-            constraint_type: ConstraintType {
-                ql: FieldElement::one(),
-                qr: FieldElement::zero(),
-                qm: FieldElement::zero(),
-                qo: -FieldElement::one(),
-                qc: constant,
-            },
-            l: self.0,
-            r: constraint_system.empty_wire(),
-            o: result.0,
-            hint: None,
-        });
-        result
-    }
-
-    /// Generates a new variables `v = c1 * v1 + c2 * v2 + b`
-    fn linear_combination<F: IsField>(
-        v1: &Variable,
-        c1: FieldElement<F>,
-        v2: &Variable,
-        c2: FieldElement<F>,
-        bias: FieldElement<F>,
-        constraint_system: &mut ConstraintSystem<F>,
-    ) -> Variable {
-        let result = Self::new(constraint_system);
-        constraint_system.add_constraint(PlonkConstraint {
-            constraint_type: ConstraintType {
-                ql: c1,
-                qr: c2,
-                qm: FieldElement::zero(),
-                qo: -FieldElement::one(),
-                qc: bias,
-            },
-            l: v1.0,
-            r: v2.0,
-            o: result.0,
-            hint: None,
-        });
-        result
-    }
-
     fn new_boolean<F: IsField>(constraint_system: &mut ConstraintSystem<F>) -> Self {
         let boolean = Self::new(constraint_system);
         constraint_system.add_constraint(PlonkConstraint {
@@ -199,48 +212,45 @@ impl Variable {
         v: &Variable,
         constraint_system: &mut ConstraintSystem<F>,
     ) -> Vec<Self> {
-        let hint = |v: &FieldElement<F>| {
+        let bits: Vec<_> = (0..32)
+            .map(|_| Self::new_boolean(constraint_system))
+            .collect();
+        let mut aux_vars: Vec<Variable> = Vec::new();
+        let hint_function = |v: &FieldElement<F>| {
             if v.representative() & 1.into() == 1.into() {
                 FieldElement::one()
             } else {
                 FieldElement::zero()
             }
         };
-        let bits: Vec<_> = (0..32)
-            .map(|_| Self::new_boolean(constraint_system))
-            .collect();
-        let mut aux_vars: Vec<Variable> = Vec::new();
 
-        let t_0 = Self::new(constraint_system);
-        constraint_system.add_constraint(PlonkConstraint {
-            constraint_type: ConstraintType {
-                ql: FieldElement::from(2),
-                qr: FieldElement::one(),
-                qm: FieldElement::zero(),
-                qo: -FieldElement::one(),
-                qc: FieldElement::zero(),
-            },
-            l: bits[0].0,
-            r: bits[1].0,
-            o: t_0.0,
-            hint: Some((hint, Column::O, Column::R)),
+        let hint = Some(Hint {
+            function: hint_function,
+            input: Column::O,
+            output: Column::R,
         });
+        // t0 := 2 b_0 + b_1
+        let t_0 = Self::linear_combination(
+            &bits[0],
+            FieldElement::from(2),
+            &bits[1],
+            FieldElement::one(),
+            FieldElement::zero(),
+            hint.clone(),
+            constraint_system,
+        );
         aux_vars.push(t_0);
         for i in 2..32 {
-            let t_i = Self::new(constraint_system);
-            constraint_system.add_constraint(PlonkConstraint {
-                constraint_type: ConstraintType {
-                    ql: FieldElement::from(2),
-                    qr: FieldElement::one(),
-                    qm: FieldElement::zero(),
-                    qo: -FieldElement::one(),
-                    qc: FieldElement::zero(),
-                },
-                l: aux_vars.last().unwrap().0,
-                r: bits[i].0,
-                o: t_i.0,
-                hint: Some((hint, Column::O, Column::R)),
-            });
+            // t_{i+1} := 2 t_i + b_i
+            let t_i = Self::linear_combination(
+                &aux_vars.last().unwrap(),
+                FieldElement::from(2),
+                &bits[i],
+                FieldElement::one(),
+                FieldElement::zero(),
+                hint.clone(),
+                constraint_system,
+            );
             aux_vars.push(t_i);
         }
         Self::assert_eq(v, aux_vars.last().unwrap(), constraint_system);
@@ -268,6 +278,17 @@ impl Variable {
     fn inv<F: IsField>(v: &Self, constraint_system: &mut ConstraintSystem<F>) -> (Self, Self) {
         let is_zero = Self::new(constraint_system);
         let v_inverse = Self::new(constraint_system);
+        let hint = Some(Hint {
+            function: |v: &FieldElement<F>| {
+                if *v == FieldElement::zero() {
+                    FieldElement::one()
+                } else {
+                    FieldElement::zero()
+                }
+            },
+            input: Column::L,
+            output: Column::R,
+        });
         // v * z == 0
         constraint_system.add_constraint(PlonkConstraint {
             constraint_type: ConstraintType {
@@ -280,17 +301,7 @@ impl Variable {
             l: v.0,
             r: is_zero.0,
             o: constraint_system.empty_wire(),
-            hint: Some((
-                |v: &FieldElement<F>| {
-                    if *v == FieldElement::zero() {
-                        FieldElement::one()
-                    } else {
-                        FieldElement::zero()
-                    }
-                },
-                Column::L,
-                Column::R,
-            )),
+            hint: hint,
         });
         // v * w + z == 1
         constraint_system.add_constraint(PlonkConstraint {
@@ -304,17 +315,17 @@ impl Variable {
             l: v.0,
             r: v_inverse.0, // w
             o: is_zero.0,   // z
-            hint: Some((
-                |v: &FieldElement<F>| {
+            hint: Some(Hint {
+                function: |v: &FieldElement<F>| {
                     if *v == FieldElement::zero() {
-                        FieldElement::zero()
+                        FieldElement::one()
                     } else {
-                        v.inv()
+                        FieldElement::zero()
                     }
                 },
-                Column::L,
-                Column::R,
-            )),
+                input: Column::L,
+                output: Column::R,
+            }),
         });
         (is_zero, v_inverse)
     }
@@ -371,36 +382,49 @@ fn solver<F: IsField>(
             let has_r = assignments.contains_key(&constraint.r);
             let has_o = assignments.contains_key(&constraint.o);
 
-            if let Some((hint, input_col, output_col)) = &constraint.hint {
-                match (input_col, output_col, has_l, has_r, has_o) {
+            if let Some(hint) = &constraint.hint {
+                let function = hint.function;
+                match (&hint.input, &hint.output, has_l, has_r, has_o) {
                     (Column::L, Column::R, true, false, _) => {
-                        assignments
-                            .insert(constraint.r, hint(assignments.get(&constraint.l).unwrap()));
+                        assignments.insert(
+                            constraint.r,
+                            function(assignments.get(&constraint.l).unwrap()),
+                        );
                         number_solved += 1;
                     }
                     (Column::L, Column::O, true, _, false) => {
-                        assignments
-                            .insert(constraint.o, hint(assignments.get(&constraint.l).unwrap()));
+                        assignments.insert(
+                            constraint.o,
+                            function(assignments.get(&constraint.l).unwrap()),
+                        );
                         number_solved += 1;
                     }
                     (Column::R, Column::L, false, true, _) => {
-                        assignments
-                            .insert(constraint.l, hint(assignments.get(&constraint.r).unwrap()));
+                        assignments.insert(
+                            constraint.l,
+                            function(assignments.get(&constraint.r).unwrap()),
+                        );
                         number_solved += 1;
                     }
                     (Column::R, Column::O, _, true, false) => {
-                        assignments
-                            .insert(constraint.o, hint(assignments.get(&constraint.r).unwrap()));
+                        assignments.insert(
+                            constraint.o,
+                            function(assignments.get(&constraint.r).unwrap()),
+                        );
                         number_solved += 1;
                     }
                     (Column::O, Column::L, false, _, true) => {
-                        assignments
-                            .insert(constraint.l, hint(assignments.get(&constraint.o).unwrap()));
+                        assignments.insert(
+                            constraint.l,
+                            function(assignments.get(&constraint.o).unwrap()),
+                        );
                         number_solved += 1;
                     }
                     (Column::O, Column::R, _, false, true) => {
-                        assignments
-                            .insert(constraint.r, hint(assignments.get(&constraint.o).unwrap()));
+                        assignments.insert(
+                            constraint.r,
+                            function(assignments.get(&constraint.o).unwrap()),
+                        );
                         number_solved += 1;
                     }
                     _ => {}
