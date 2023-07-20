@@ -41,6 +41,8 @@ struct ConstraintSystem<F: IsField> {
     constraints: Vec<PlonkConstraint<F>>,
 }
 
+struct Variable(usize);
+
 impl<F> ConstraintSystem<F>
 where
     F: IsField,
@@ -338,13 +340,7 @@ where
     }
 }
 
-struct Variable(usize);
 
-impl Variable {
-    fn new<F: IsField>(constraint_system: &mut ConstraintSystem<F>) -> Self {
-        Variable(constraint_system.new_wire())
-    }
-}
 
 fn solver<F: IsField>(
     constraint_system: &ConstraintSystem<F>,
