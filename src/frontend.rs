@@ -58,14 +58,10 @@ where
         0
     }
 
-    fn new_wire(&mut self) -> usize {
+    fn new_variable(&mut self) -> Variable {
         let variable_id = self.num_variables;
         self.num_variables += 1;
-        variable_id
-    }
-
-    fn new_variable(&mut self) -> Variable {
-        Variable(self.new_wire())
+        Variable(variable_id)
     }
 
     fn add_constraint(&mut self, constraint: PlonkConstraint<F>) {
