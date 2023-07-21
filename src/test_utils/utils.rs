@@ -56,7 +56,7 @@ pub fn generate_permutation_coefficients<F: IsField>(
     omega: &FieldElement<F>,
     n: usize,
     permutation: &[usize],
-    order_r_minus_1_root_unity: &FieldElement<F>
+    order_r_minus_1_root_unity: &FieldElement<F>,
 ) -> Vec<FieldElement<F>> {
     let identity = identity_permutation(omega, n, order_r_minus_1_root_unity);
     let permuted: Vec<FieldElement<F>> = (0..n * 3)
@@ -66,7 +66,11 @@ pub fn generate_permutation_coefficients<F: IsField>(
 }
 
 /// The identity permutation, auxiliary function to generate the copy constraints.
-fn identity_permutation<F: IsField>(w: &FieldElement<F>, n: usize, order_r_minus_1_root_unity: &FieldElement<F>) -> Vec<FieldElement<F>> {
+fn identity_permutation<F: IsField>(
+    w: &FieldElement<F>,
+    n: usize,
+    order_r_minus_1_root_unity: &FieldElement<F>,
+) -> Vec<FieldElement<F>> {
     let u = order_r_minus_1_root_unity;
     let mut result: Vec<FieldElement<F>> = vec![];
     for index_column in 0..=2 {

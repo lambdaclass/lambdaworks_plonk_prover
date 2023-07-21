@@ -1,5 +1,9 @@
 use std::collections::HashMap;
 
+use crate::frontend::{get_permutation, ConstraintSystem, Variable};
+use crate::test_utils::utils::{
+    generate_domain, generate_permutation_coefficients, ORDER_R_MINUS_1_ROOT_UNITY,
+};
 use lambdaworks_crypto::commitments::traits::IsCommitmentScheme;
 use lambdaworks_crypto::fiat_shamir::default_transcript::DefaultTranscript;
 use lambdaworks_crypto::fiat_shamir::transcript::Transcript;
@@ -8,8 +12,6 @@ use lambdaworks_math::field::traits::IsFFTField;
 use lambdaworks_math::field::{element::FieldElement, traits::IsField};
 use lambdaworks_math::polynomial::Polynomial;
 use lambdaworks_math::traits::{ByteConversion, Serializable};
-use crate::frontend::{ConstraintSystem, get_permutation, Variable};
-use crate::test_utils::utils::{generate_domain, ORDER_R_MINUS_1_ROOT_UNITY, generate_permutation_coefficients};
 
 // TODO: implement getters
 pub struct Witness<F: IsField> {
@@ -19,32 +21,39 @@ pub struct Witness<F: IsField> {
 }
 
 impl<F: IsField> Witness<F> {
-    pub fn solving(system: &ConstraintSystem<F>, inputs: &mut HashMap<Variable, FieldElement<F>>) -> Self {
-        system.solve(inputs).unwrap();
-        let mut a = Vec::new();
-        let mut b = Vec::new();
-        let mut c = Vec::new();
+    pub fn new(
+        system: &ConstraintSystem<F>,
+        inputs: &HashMap<Variable, FieldElement<F>>,
+        length: usize,
+    ) -> Self {
+        let mut a = Vec::with_capacity(length);
+        let mut b = Vec::with_capacity(length);
+        let mut c = Vec::with_capacity(length);
 
-        for public_input in system.public_input_variables.iter() {
-            a.push(inputs[public_input].clone());
-            b.push(inputs[&system.null_variable()].clone());
-            c.push(inputs[&system.null_variable()].clone());
+        // Public input header
+        for constraint in system.public_input_header().iter() {
+            a.push(inputs[&constraint.l].clone());
+            b.push(inputs[&constraint.r].clone());
+            c.push(inputs[&constraint.o].clone());
         }
 
+        // Body
         for constraint in system.constraints.iter() {
             a.push(inputs[&constraint.l].clone());
             b.push(inputs[&constraint.r].clone());
             c.push(inputs[&constraint.o].clone());
         }
 
-        let pad = a.len().next_power_of_two() - a.len();
-        for _ in 0..pad {
-            a.push(inputs[&system.null_variable()].clone());
-            b.push(inputs[&system.null_variable()].clone());
-            c.push(inputs[&system.null_variable()].clone());
+        // Padding
+        let padding_constraint = system.padding_constraint();
+        let pad_length = length - a.len();
+        for _ in 0..pad_length {
+            a.push(inputs[&padding_constraint.l].clone());
+            b.push(inputs[&padding_constraint.r].clone());
+            c.push(inputs[&padding_constraint.o].clone());
         }
 
-        Self {a, b, c}
+        Self { a, b, c }
     }
 }
 
@@ -73,16 +82,40 @@ pub struct CommonPreprocessedInput<F: IsField> {
 }
 
 impl<F: IsFFTField> CommonPreprocessedInput<F> {
-    pub fn from_constraint_system(system: &ConstraintSystem<F>, order_r_minus_1_root_unity: &FieldElement<F>) -> Self {
-        let n = system.constraints.len();
+    pub fn from_constraint_system(
+        system: &ConstraintSystem<F>,
+        order_r_minus_1_root_unity: &FieldElement<F>,
+    ) -> Self {
+        let header = system.public_input_header();
+        let body = &system.constraints;
+        let total_length = (header.len() + body.len()).next_power_of_two();
+        let pad = vec![system.padding_constraint().clone(); total_length - header.len() - body.len()];
+
+        let mut full_constraints = header;
+        full_constraints.extend_from_slice(&body);
+        full_constraints.extend_from_slice(&pad);
+
+        let n = full_constraints.len();
         let omega = F::get_primitive_root_of_unity(n.trailing_zeros() as u64).unwrap();
         let domain = generate_domain(&omega, n);
-        let permutation = get_permutation(&system);
-        let permuted = generate_permutation_coefficients(&omega, n, &permutation, order_r_minus_1_root_unity);
+
+        let n_constraints = full_constraints.len();
+        let mut lro = vec![system.null_variable(); n_constraints * 3];
+
+        // Make a single vector with | a_1 .. a_m | b_1 .. b_m | c_1 .. c_m | concatenated.
+        for (index, constraint) in full_constraints.iter().enumerate() {
+            lro[index] = constraint.l;
+            lro[index + n_constraints] = constraint.r;
+            lro[index + n_constraints * 2] = constraint.o;
+        }
+
+        let permutation = get_permutation(&lro);
+        let permuted =
+            generate_permutation_coefficients(&omega, n, &permutation, order_r_minus_1_root_unity);
 
         let s1_lagrange: Vec<FieldElement<F>> = permuted[..n].to_vec();
-        let s2_lagrange: Vec<FieldElement<F>> = permuted[n..2*n].to_vec();
-        let s3_lagrange: Vec<FieldElement<F>> = permuted[2*n..].to_vec();
+        let s2_lagrange: Vec<FieldElement<F>> = permuted[n..2 * n].to_vec();
+        let s3_lagrange: Vec<FieldElement<F>> = permuted[2 * n..].to_vec();
 
         let mut ql = Vec::new();
         let mut qr = Vec::new();
@@ -91,7 +124,7 @@ impl<F: IsFFTField> CommonPreprocessedInput<F> {
         let mut qc = Vec::new();
 
         // Add constraints
-        for constraint in system.constraints.iter() {
+        for constraint in full_constraints.iter() {
             ql.push(constraint.constraint_type.ql.clone());
             qr.push(constraint.constraint_type.qr.clone());
             qm.push(constraint.constraint_type.qm.clone());

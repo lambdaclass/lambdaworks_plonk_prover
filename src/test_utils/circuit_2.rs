@@ -27,7 +27,8 @@ pub fn test_common_preprocessed_input_2() -> CommonPreprocessedInput<FrField> {
     let permutation = &[
         23, 4, 0, 18, 1, 2, 5, 6, 7, 8, 10, 9, 19, 11, 13, 14, 15, 16, 3, 12, 17, 20, 21, 22,
     ];
-    let permuted = generate_permutation_coefficients(&omega, n, permutation, &ORDER_R_MINUS_1_ROOT_UNITY);
+    let permuted =
+        generate_permutation_coefficients(&omega, n, permutation, &ORDER_R_MINUS_1_ROOT_UNITY);
 
     let s1_lagrange: Vec<FrElement> = permuted[..8].to_vec();
     let s2_lagrange: Vec<FrElement> = permuted[8..16].to_vec();
