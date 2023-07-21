@@ -522,6 +522,33 @@ where
     }
 }
 
+fn get_permutation<F: IsField>(constraint_system: &ConstraintSystem<F>) -> Vec<usize> {
+    let n_constraints = constraint_system.constraints.len();
+    let mut lro = vec![constraint_system.null_variable(); n_constraints * 3];
+
+    // Make a single vector with | a_1 .. a_m | b_1 .. b_m | c_1 .. c_m | concatenated.
+    for (index, constraint) in constraint_system.constraints.iter().enumerate() {
+        lro[index] = constraint.l;
+        lro[index + n_constraints] = constraint.r;
+        lro[index + n_constraints * 2] = constraint.o;
+    }
+
+    // For each variable store the indexes where it appears.
+    let mut last_usage: HashMap<Variable, usize> = HashMap::new();
+    let mut permutation = vec![0 as usize; n_constraints * 3];
+
+    for _ in 0..2 {
+        for (index, variable) in lro.iter().enumerate() {
+            if last_usage.contains_key(variable) {
+                permutation[index] = last_usage[variable];
+            }
+            last_usage.insert(*variable, index);
+        }
+    }
+
+    permutation
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -529,6 +556,41 @@ mod tests {
         elliptic_curve::short_weierstrass::curves::bls12_381::default_types::FrField,
         field::{element::FieldElement, fields::u64_prime_field::U64PrimeField},
     };
+
+    /*
+    Program:
+    v0 = 1
+    v1 = 2
+    v2 = v0 + v1
+    v3 = v1 + v0
+    v4 = v2 + v3
+
+    Wirings:
+    A  B  C
+    0  1  2
+    1  0  3
+    2  3  4
+
+    LRO        : 0 1 2 1 0 3 2 3 4
+    Permutation: 4 3 6 1 0 7 2 5 8
+
+    */
+    #[test]
+    fn test_permutation() {
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let v0 = system.new_variable();
+        let v1 = system.new_variable();
+        
+        let v2 = system.add(&v0, &v1);
+        let v3 = system.add(&v1, &v0);
+        let v4 = system.add(&v2, &v3);
+
+        let permutation = get_permutation(&system);
+        let expected = vec![4, 3, 6, 1, 0, 7, 2, 5, 8];
+        assert_eq!(expected, permutation);
+    }
+
     #[test]
     fn test_linear_combination() {
         let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
