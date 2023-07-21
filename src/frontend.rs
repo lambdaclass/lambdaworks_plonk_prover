@@ -106,6 +106,7 @@ where
         v: &Variable,
         c: FieldElement<F>,
         b: FieldElement<F>,
+        hint: Option<Hint<F>>,
     ) -> Variable {
         let result = self.new_variable();
         self.add_constraint(PlonkConstraint {
@@ -119,7 +120,7 @@ where
             l: *v,
             r: self.null_variable(),
             o: result,
-            hint: None,
+            hint,
         });
         result
     }
@@ -136,7 +137,7 @@ where
     }
 
     fn add_constant(&mut self, v: &Variable, constant: FieldElement<F>) -> Variable {
-        self.linear_function(v, FieldElement::one(), constant)
+        self.linear_function(v, FieldElement::one(), constant, None)
     }
 
     fn mul(&mut self, v1: &Variable, v2: &Variable) -> Variable {
@@ -490,14 +491,29 @@ mod tests {
         let x = FieldElement::from(17);
         let y = FieldElement::from(29);
 
-        let mut inputs = HashMap::from([
-            (v1, x),
-            (v2, y),
-        ]);
+        let mut inputs = HashMap::from([(v1, x), (v2, y)]);
 
         solver(&system, &mut inputs).unwrap();
-        assert_eq!(inputs.get(&result).unwrap(), &FieldElement::from(x * c1 + y * c2 + b));
+        assert_eq!(inputs.get(&result).unwrap(), &(x * c1 + y * c2 + b));
     }
+
+    #[test]
+    fn test_linear_function() {
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let v = system.new_variable();
+        let c = FieldElement::from(8);
+        let b = FieldElement::from(109);
+        let result = system.linear_function(&v, c, b, None);
+
+        let x = FieldElement::from(17);
+
+        let mut inputs = HashMap::from([(v, x)]);
+
+        solver(&system, &mut inputs).unwrap();
+        assert_eq!(inputs.get(&result).unwrap(), &(x * c + b));
+    }
+
     #[test]
     fn test_add() {
         let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
@@ -506,16 +522,13 @@ mod tests {
         let input2 = system.new_variable();
         let result = system.add(&input1, &input2);
 
-        let a = 3;
-        let b = 10;
+        let a = FieldElement::from(3);
+        let b = FieldElement::from(10);
 
-        let mut inputs = HashMap::from([
-            (input1, FieldElement::from(a)),
-            (input2, FieldElement::from(b)),
-        ]);
+        let mut inputs = HashMap::from([(input1, a), (input2, b)]);
 
         solver(&system, &mut inputs).unwrap();
-        assert_eq!(inputs.get(&result).unwrap(), &FieldElement::from(a + b));
+        assert_eq!(inputs.get(&result).unwrap(), &(a + b));
     }
 
     #[test]
@@ -526,16 +539,13 @@ mod tests {
         let input2 = system.new_variable();
         let result = system.mul(&input1, &input2);
 
-        let a = 3;
-        let b = 11;
+        let a = FieldElement::from(3);
+        let b = FieldElement::from(11);
 
-        let mut inputs = HashMap::from([
-            (input1, FieldElement::from(a)),
-            (input2, FieldElement::from(b)),
-        ]);
+        let mut inputs = HashMap::from([(input1, a), (input2, b)]);
 
         solver(&system, &mut inputs).unwrap();
-        assert_eq!(inputs.get(&result).unwrap(), &FieldElement::from(a * b));
+        assert_eq!(inputs.get(&result).unwrap(), &(a * b));
     }
 
     #[test]
@@ -549,10 +559,7 @@ mod tests {
         let a = FieldElement::from(3);
         let b = FieldElement::from(11);
 
-        let mut inputs = HashMap::from([
-            (input1, FieldElement::from(a)),
-            (input2, FieldElement::from(b)),
-        ]);
+        let mut inputs = HashMap::from([(input1, a), (input2, b)]);
 
         solver(&system, &mut inputs).unwrap();
         assert_eq!(inputs.get(&result).unwrap(), &(a / b));
