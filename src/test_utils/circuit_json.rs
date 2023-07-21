@@ -39,7 +39,7 @@ pub fn common_preprocessed_input_from_json(
     let n = json_input.N_Padded;
     let omega = FrField::get_primitive_root_of_unity(n.trailing_zeros() as u64).unwrap();
     let domain = generate_domain(&omega, n);
-    let permuted = generate_permutation_coefficients(&omega, n, &json_input.Permutation);
+    let permuted = generate_permutation_coefficients(&omega, n, &json_input.Permutation, &ORDER_R_MINUS_1_ROOT_UNITY);
 
     let pad = FrElement::from_hex_unchecked(&json_input.Input[0]);
 

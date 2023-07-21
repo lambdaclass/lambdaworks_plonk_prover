@@ -1,15 +1,51 @@
+use std::collections::HashMap;
+
 use lambdaworks_crypto::commitments::traits::IsCommitmentScheme;
 use lambdaworks_crypto::fiat_shamir::default_transcript::DefaultTranscript;
 use lambdaworks_crypto::fiat_shamir::transcript::Transcript;
+use lambdaworks_math::fft::polynomial::FFTPoly;
+use lambdaworks_math::field::traits::IsFFTField;
 use lambdaworks_math::field::{element::FieldElement, traits::IsField};
 use lambdaworks_math::polynomial::Polynomial;
 use lambdaworks_math::traits::{ByteConversion, Serializable};
+use crate::frontend::{ConstraintSystem, get_permutation, Variable};
+use crate::test_utils::utils::{generate_domain, ORDER_R_MINUS_1_ROOT_UNITY, generate_permutation_coefficients};
 
 // TODO: implement getters
 pub struct Witness<F: IsField> {
     pub a: Vec<FieldElement<F>>,
     pub b: Vec<FieldElement<F>>,
     pub c: Vec<FieldElement<F>>,
+}
+
+impl<F: IsField> Witness<F> {
+    pub fn solving(system: &ConstraintSystem<F>, inputs: &mut HashMap<Variable, FieldElement<F>>) -> Self {
+        system.solve(inputs).unwrap();
+        let mut a = Vec::new();
+        let mut b = Vec::new();
+        let mut c = Vec::new();
+
+        for public_input in system.public_input_variables.iter() {
+            a.push(inputs[public_input].clone());
+            b.push(inputs[&system.null_variable()].clone());
+            c.push(inputs[&system.null_variable()].clone());
+        }
+
+        for constraint in system.constraints.iter() {
+            a.push(inputs[&constraint.l].clone());
+            b.push(inputs[&constraint.r].clone());
+            c.push(inputs[&constraint.o].clone());
+        }
+
+        let pad = a.len().next_power_of_two() - a.len();
+        for _ in 0..pad {
+            a.push(inputs[&system.null_variable()].clone());
+            b.push(inputs[&system.null_variable()].clone());
+            c.push(inputs[&system.null_variable()].clone());
+        }
+
+        Self {a, b, c}
+    }
 }
 
 // TODO: implement getters
@@ -34,6 +70,53 @@ pub struct CommonPreprocessedInput<F: IsField> {
     pub s1_lagrange: Vec<FieldElement<F>>,
     pub s2_lagrange: Vec<FieldElement<F>>,
     pub s3_lagrange: Vec<FieldElement<F>>,
+}
+
+impl<F: IsFFTField> CommonPreprocessedInput<F> {
+    pub fn from_constraint_system(system: &ConstraintSystem<F>, order_r_minus_1_root_unity: &FieldElement<F>) -> Self {
+        let n = system.constraints.len();
+        let omega = F::get_primitive_root_of_unity(2).unwrap();
+        let domain = generate_domain(&omega, n);
+        let permutation = get_permutation(&system);
+        let permuted = generate_permutation_coefficients(&omega, n, &permutation, order_r_minus_1_root_unity);
+
+        let s1_lagrange: Vec<FieldElement<F>> = permuted[..n].to_vec();
+        let s2_lagrange: Vec<FieldElement<F>> = permuted[n..2*n].to_vec();
+        let s3_lagrange: Vec<FieldElement<F>> = permuted[2*n..].to_vec();
+
+        let mut ql = Vec::new();
+        let mut qr = Vec::new();
+        let mut qm = Vec::new();
+        let mut qo = Vec::new();
+        let mut qc = Vec::new();
+
+        // Add constraints
+        for constraint in system.constraints.iter() {
+            ql.push(constraint.constraint_type.ql.clone());
+            qr.push(constraint.constraint_type.qr.clone());
+            qm.push(constraint.constraint_type.qm.clone());
+            qo.push(constraint.constraint_type.qo.clone());
+            qc.push(constraint.constraint_type.qc.clone());
+        }
+
+        Self {
+            domain: domain,
+            n,
+            omega: omega,
+            k1: order_r_minus_1_root_unity.clone(),
+            ql: Polynomial::interpolate_fft(&ql).unwrap(), // TODO: Remove unwraps
+            qr: Polynomial::interpolate_fft(&qr).unwrap(),
+            qo: Polynomial::interpolate_fft(&qo).unwrap(),
+            qm: Polynomial::interpolate_fft(&qm).unwrap(),
+            qc: Polynomial::interpolate_fft(&qc).unwrap(),
+            s1: Polynomial::interpolate_fft(&s1_lagrange).unwrap(),
+            s2: Polynomial::interpolate_fft(&s2_lagrange).unwrap(),
+            s3: Polynomial::interpolate_fft(&s3_lagrange).unwrap(),
+            s1_lagrange,
+            s2_lagrange,
+            s3_lagrange,
+        }
+    }
 }
 
 #[allow(unused)]

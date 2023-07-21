@@ -5,12 +5,13 @@ use lambdaworks_math::field::{
 use std::collections::HashMap;
 
 // a Ql + b Qr + a b Qm + c Qo + Qc = 0
-struct ConstraintType<F: IsField> {
-    ql: FieldElement<F>,
-    qr: FieldElement<F>,
-    qm: FieldElement<F>,
-    qo: FieldElement<F>,
-    qc: FieldElement<F>,
+#[derive(Clone)]
+pub struct ConstraintType<F: IsField> {
+    pub ql: FieldElement<F>,
+    pub qr: FieldElement<F>,
+    pub qm: FieldElement<F>,
+    pub qo: FieldElement<F>,
+    pub qc: FieldElement<F>,
 }
 
 #[derive(Clone)]
@@ -22,22 +23,23 @@ enum Column {
 
 #[allow(unused)]
 #[derive(Clone)]
-struct Hint<F: IsField> {
+pub struct Hint<F: IsField> {
     function: fn(&FieldElement<F>) -> FieldElement<F>,
     input: Column,
     output: Column,
 }
 
 #[allow(unused)]
-type Variable = usize;
+pub type Variable = usize;
 
 #[allow(unused)]
-struct Constraint<F: IsField> {
-    constraint_type: ConstraintType<F>,
+#[derive(Clone)]
+pub struct Constraint<F: IsField> {
+    pub constraint_type: ConstraintType<F>,
     hint: Option<Hint<F>>,
-    l: Variable,
-    r: Variable,
-    o: Variable,
+    pub l: Variable,
+    pub r: Variable,
+    pub o: Variable,
 }
 
 impl<F: IsField> Constraint<F> {
@@ -90,9 +92,10 @@ impl<F: IsField> Constraint<F> {
 }
 
 #[allow(unused)]
-struct ConstraintSystem<F: IsField> {
+pub struct ConstraintSystem<F: IsField> {
     num_variables: usize,
-    constraints: Vec<Constraint<F>>,
+    pub public_input_variables: Vec<Variable>,
+    pub constraints: Vec<Constraint<F>>,
 }
 
 #[allow(unused)]
@@ -103,11 +106,12 @@ where
     fn new() -> Self {
         Self {
             num_variables: 0,
+            public_input_variables: Vec::new(),
             constraints: Vec::new(),
         }
     }
 
-    fn null_variable(&self) -> Variable {
+    pub fn null_variable(&self) -> Variable {
         0
     }
 
@@ -115,6 +119,12 @@ where
         let variable_id = self.num_variables;
         self.num_variables += 1;
         variable_id
+    }
+
+    fn new_public_input(&mut self) -> Variable {
+        let new_variable = self.new_variable();
+        self.public_input_variables.push(new_variable);
+        new_variable
     }
 
     fn new_constant(&mut self, value: FieldElement<F>) -> Variable {
@@ -392,7 +402,28 @@ where
         self.if_else(&is_zero, v2, v1)
     }
 
-    fn solve(&self, assignments: &mut HashMap<Variable, FieldElement<F>>) -> Result<(), ()> {
+    pub fn add_public_input_header(&mut self) {
+        let zero = FieldElement::zero();
+        let minus_one = -FieldElement::one();
+        let mut public_input_constraints = Vec::new();
+        for public_input in self.public_input_variables.iter() {
+            let public_input_constraint =  Constraint { constraint_type: ConstraintType { ql: minus_one.clone(), qr: zero.clone(), qm: zero.clone(), qo: zero.clone(), qc: zero.clone() }, hint: None, l: public_input.clone(), r: self.null_variable(), o: self.null_variable() };
+            public_input_constraints.push(public_input_constraint);
+        }
+        public_input_constraints.append(&mut self.constraints);
+        self.constraints = public_input_constraints; 
+    }
+    
+    pub fn pad(&mut self) {
+        let zero = FieldElement::zero();
+        let null_constraint = Constraint { constraint_type: ConstraintType { ql: zero.clone(), qr: zero.clone(), qm: zero.clone(), qo: zero.clone(), qc: zero.clone() }, hint: None, l: self.null_variable(), r: self.null_variable(), o: self.null_variable() };
+        let pad = self.constraints.len().next_power_of_two() - self.constraints.len();
+        for _ in 0..pad {
+            self.constraints.push(null_constraint.clone());
+        }
+    }
+
+    pub fn solve(&self, assignments: &mut HashMap<Variable, FieldElement<F>>) -> Result<(), ()> {
         let mut number_solved = 0;
         let mut checked_constraints = vec![false; self.constraints.len()];
         loop {
@@ -522,7 +553,7 @@ where
     }
 }
 
-fn get_permutation<F: IsField>(constraint_system: &ConstraintSystem<F>) -> Vec<usize> {
+pub fn get_permutation<F: IsField>(constraint_system: &ConstraintSystem<F>) -> Vec<usize> {
     let n_constraints = constraint_system.constraints.len();
     let mut lro = vec![constraint_system.null_variable(); n_constraints * 3];
 
@@ -551,6 +582,8 @@ fn get_permutation<F: IsField>(constraint_system: &ConstraintSystem<F>) -> Vec<u
 
 #[cfg(test)]
 mod tests {
+    use crate::{setup::{CommonPreprocessedInput, Witness, setup}, test_utils::utils::{ORDER_R_MINUS_1_ROOT_UNITY, FpField, test_srs, KZG, TestRandomFieldGenerator}, prover::Prover, verifier::Verifier};
+
     use super::*;
     use lambdaworks_math::{
         elliptic_curve::short_weierstrass::curves::bls12_381::default_types::FrField,
@@ -590,6 +623,49 @@ mod tests {
         let expected = vec![4, 3, 6, 1, 0, 7, 2, 5, 8];
         assert_eq!(expected, permutation);
     }
+
+    #[test]
+    fn test_prove_simple_program() {
+        let system = &mut ConstraintSystem::<FrField>::new();
+
+        let v0 = system.new_public_input();
+        let v1 = system.new_public_input();
+        
+        let v2 = system.add(&v0, &v1);
+        let v3 = system.mul(&v1, &v0);
+        let v4 = system.add_constant(&v2, FieldElement::one());
+
+        let public_input = [FieldElement::from(2), FieldElement::from(2)];
+        let mut inputs = HashMap::from([(v0, public_input[0].clone()), (v1, public_input[1].clone())]);
+        let witness = Witness::solving(&system, &mut inputs);
+
+        system.add_public_input_header();
+        system.pad();
+
+        let common_preprocessed_input = CommonPreprocessedInput::from_constraint_system(&system, &ORDER_R_MINUS_1_ROOT_UNITY);
+        let srs = test_srs(common_preprocessed_input.n);
+
+        let kzg = KZG::new(srs);
+        let verifying_key = setup(&common_preprocessed_input, &kzg);
+        let random_generator = TestRandomFieldGenerator {};
+
+        let prover = Prover::new(kzg.clone(), random_generator);
+        let proof = prover.prove(
+            &witness,
+            &public_input,
+            &common_preprocessed_input,
+            &verifying_key,
+        );
+
+        let verifier = Verifier::new(kzg);
+        assert!(verifier.verify(
+            &proof,
+            &public_input,
+            &common_preprocessed_input,
+            &verifying_key
+        ));
+    }
+
 
     #[test]
     fn test_linear_combination() {

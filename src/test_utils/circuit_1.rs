@@ -24,7 +24,7 @@ pub fn test_common_preprocessed_input_1() -> CommonPreprocessedInput<FrField> {
     let omega = FrField::get_primitive_root_of_unity(2).unwrap();
     let domain = generate_domain(&omega, n);
     let permuted =
-        generate_permutation_coefficients(&omega, n, &[11, 3, 0, 1, 2, 4, 6, 10, 5, 8, 7, 9]);
+        generate_permutation_coefficients(&omega, n, &[11, 3, 0, 1, 2, 4, 6, 10, 5, 8, 7, 9], &ORDER_R_MINUS_1_ROOT_UNITY);
 
     let s1_lagrange: Vec<FrElement> = permuted[..4].to_vec();
     let s2_lagrange: Vec<FrElement> = permuted[4..8].to_vec();
