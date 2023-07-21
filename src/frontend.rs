@@ -301,9 +301,9 @@ where
             hint: Some(Hint {
                 function: |v: &FieldElement<F>| {
                     if *v == FieldElement::zero() {
-                        FieldElement::one()
-                    } else {
                         FieldElement::zero()
+                    } else {
+                        v.inv()
                     }
                 },
                 input: Column::L,
@@ -340,137 +340,129 @@ where
         let (is_zero, _) = self.inv(condition);
         self.if_else(&is_zero, v2, v1)
     }
-}
 
-#[allow(unused)]
-fn solver<F: IsField>(
-    constraint_system: &ConstraintSystem<F>,
-    assignments: &mut HashMap<Variable, FieldElement<F>>,
-) -> Result<(), ()> {
-    let mut number_solved = 0;
-    let mut checked_constraints = vec![false; constraint_system.constraints.len()];
-    loop {
-        let old_solved = number_solved;
-        for (i, constraint) in constraint_system.constraints.iter().enumerate() {
-            let ct = &constraint.constraint_type;
-            let has_l = assignments.contains_key(&constraint.l);
-            let has_r = assignments.contains_key(&constraint.r);
-            let has_o = assignments.contains_key(&constraint.o);
+    fn solve(&self, assignments: &mut HashMap<Variable, FieldElement<F>>) -> Result<(), ()> {
+        let mut number_solved = 0;
+        let mut checked_constraints = vec![false; self.constraints.len()];
+        loop {
+            let old_solved = number_solved;
+            for (i, constraint) in self.constraints.iter().enumerate() {
+                let ct = &constraint.constraint_type;
+                let has_l = assignments.contains_key(&constraint.l);
+                let has_r = assignments.contains_key(&constraint.r);
+                let has_o = assignments.contains_key(&constraint.o);
 
-            if let Some(hint) = &constraint.hint {
-                let function = hint.function;
-                match (&hint.input, &hint.output, has_l, has_r, has_o) {
-                    (Column::L, Column::R, true, false, _) => {
-                        assignments.insert(
-                            constraint.r,
-                            function(assignments.get(&constraint.l).unwrap()),
-                        );
-                        number_solved += 1;
+                if let Some(hint) = &constraint.hint {
+                    let function = hint.function;
+                    match (&hint.input, &hint.output, has_l, has_r, has_o) {
+                        (Column::L, Column::R, true, false, _) => {
+                            assignments.insert(
+                                constraint.r,
+                                function(assignments.get(&constraint.l).unwrap()),
+                            );
+                            number_solved += 1;
+                        }
+                        (Column::L, Column::O, true, _, false) => {
+                            assignments.insert(
+                                constraint.o,
+                                function(assignments.get(&constraint.l).unwrap()),
+                            );
+                            number_solved += 1;
+                        }
+                        (Column::R, Column::L, false, true, _) => {
+                            assignments.insert(
+                                constraint.l,
+                                function(assignments.get(&constraint.r).unwrap()),
+                            );
+                            number_solved += 1;
+                        }
+                        (Column::R, Column::O, _, true, false) => {
+                            assignments.insert(
+                                constraint.o,
+                                function(assignments.get(&constraint.r).unwrap()),
+                            );
+                            number_solved += 1;
+                        }
+                        (Column::O, Column::L, false, _, true) => {
+                            assignments.insert(
+                                constraint.l,
+                                function(assignments.get(&constraint.o).unwrap()),
+                            );
+                            number_solved += 1;
+                        }
+                        (Column::O, Column::R, _, false, true) => {
+                            assignments.insert(
+                                constraint.r,
+                                function(assignments.get(&constraint.o).unwrap()),
+                            );
+                            number_solved += 1;
+                        }
+                        _ => {}
                     }
-                    (Column::L, Column::O, true, _, false) => {
-                        assignments.insert(
-                            constraint.o,
-                            function(assignments.get(&constraint.l).unwrap()),
-                        );
-                        number_solved += 1;
+                }
+
+                // a Ql + b Qr + a b Qm + c Qo + Qc = 0
+                if has_l && has_r && has_o {
+                    continue;
+                } else if has_l && has_r {
+                    let a = assignments.get(&constraint.l).unwrap();
+                    let b = assignments.get(&constraint.r).unwrap();
+                    let mut c = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + &ct.qc;
+                    if ct.qo == FieldElement::zero() {
+                        continue;
                     }
-                    (Column::R, Column::L, false, true, _) => {
-                        assignments.insert(
-                            constraint.l,
-                            function(assignments.get(&constraint.r).unwrap()),
-                        );
-                        number_solved += 1;
+                    c = -c * ct.qo.inv();
+                    assignments.insert(constraint.o, c);
+                } else if has_l && has_o {
+                    let a = assignments.get(&constraint.l).unwrap();
+                    let c = assignments.get(&constraint.o).unwrap();
+                    let mut b = a * &ct.ql + c * &ct.qo + &ct.qc;
+                    let denominator = &ct.qr + a * &ct.qm;
+                    if denominator == FieldElement::zero() {
+                        continue;
                     }
-                    (Column::R, Column::O, _, true, false) => {
-                        assignments.insert(
-                            constraint.o,
-                            function(assignments.get(&constraint.r).unwrap()),
-                        );
-                        number_solved += 1;
+                    b = -b * denominator.inv();
+                    assignments.insert(constraint.r, b);
+                } else if has_r && has_o {
+                    let b = assignments.get(&constraint.r).unwrap();
+                    let c = assignments.get(&constraint.o).unwrap();
+                    let mut a = b * &ct.qr + c * &ct.qo + &ct.qc;
+                    let denominator = &ct.ql + b * &ct.qm;
+                    if denominator == FieldElement::zero() {
+                        continue;
                     }
-                    (Column::O, Column::L, false, _, true) => {
-                        assignments.insert(
-                            constraint.l,
-                            function(assignments.get(&constraint.o).unwrap()),
-                        );
-                        number_solved += 1;
+                    a = -a * denominator.inv();
+                    assignments.insert(constraint.l, a);
+                } else {
+                    continue;
+                }
+                checked_constraints[i] = true;
+                number_solved += 1;
+            }
+            if number_solved == old_solved {
+                break;
+            }
+        }
+        for (constraint, checked) in self.constraints.iter().zip(checked_constraints.iter()) {
+            if !checked {
+                let a = assignments.get(&constraint.l);
+                let b = assignments.get(&constraint.r);
+                let c = assignments.get(&constraint.o);
+
+                match (a, b, c) {
+                    (Some(a), Some(b), Some(c)) => {
+                        let ct = &constraint.constraint_type;
+                        let result = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + c * &ct.qo + &ct.qc;
+                        if result != FieldElement::zero() {
+                            return Err(());
+                        }
                     }
-                    (Column::O, Column::R, _, false, true) => {
-                        assignments.insert(
-                            constraint.r,
-                            function(assignments.get(&constraint.o).unwrap()),
-                        );
-                        number_solved += 1;
-                    }
-                    _ => {}
+                    _ => return Err(()),
                 }
             }
-
-            // a Ql + b Qr + a b Qm + c Qo + Qc = 0
-            if has_l && has_r && has_o {
-                continue;
-            } else if has_l && has_r {
-                let a = assignments.get(&constraint.l).unwrap();
-                let b = assignments.get(&constraint.r).unwrap();
-                let mut c = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + &ct.qc;
-                if ct.qo == FieldElement::zero() {
-                    continue;
-                }
-                c = -c * ct.qo.inv();
-                assignments.insert(constraint.o, c);
-            } else if has_l && has_o {
-                let a = assignments.get(&constraint.l).unwrap();
-                let c = assignments.get(&constraint.o).unwrap();
-                let mut b = a * &ct.ql + c * &ct.qo + &ct.qc;
-                let denominator = &ct.qr + a * &ct.qm;
-                if denominator == FieldElement::zero() {
-                    continue;
-                }
-                b = -b * denominator.inv();
-                assignments.insert(constraint.r, b);
-            } else if has_r && has_o {
-                let b = assignments.get(&constraint.r).unwrap();
-                let c = assignments.get(&constraint.o).unwrap();
-                let mut a = b * &ct.qr + c * &ct.qo + &ct.qc;
-                let denominator = &ct.ql + b * &ct.qm;
-                if denominator == FieldElement::zero() {
-                    continue;
-                }
-                a = -a * denominator.inv();
-                assignments.insert(constraint.l, a);
-            } else {
-                continue;
-            }
-            checked_constraints[i] = true;
-            number_solved += 1;
         }
-        if number_solved == old_solved {
-            break;
-        }
+        Ok(())
     }
-    for (constraint, checked) in constraint_system
-        .constraints
-        .iter()
-        .zip(checked_constraints.iter())
-    {
-        if !checked {
-            let a = assignments.get(&constraint.l);
-            let b = assignments.get(&constraint.r);
-            let c = assignments.get(&constraint.o);
-
-            match (a, b, c) {
-                (Some(a), Some(b), Some(c)) => {
-                    let ct = &constraint.constraint_type;
-                    let result = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + c * &ct.qo + &ct.qc;
-                    if result != FieldElement::zero() {
-                        return Err(());
-                    }
-                }
-                _ => return Err(()),
-            }
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -493,7 +485,7 @@ mod tests {
 
         let mut inputs = HashMap::from([(v1, x), (v2, y)]);
 
-        solver(&system, &mut inputs).unwrap();
+        system.solve(&mut inputs).unwrap();
         assert_eq!(inputs.get(&result).unwrap(), &(x * c1 + y * c2 + b));
     }
 
@@ -510,7 +502,7 @@ mod tests {
 
         let mut inputs = HashMap::from([(v, x)]);
 
-        solver(&system, &mut inputs).unwrap();
+        system.solve(&mut inputs).unwrap();
         assert_eq!(inputs.get(&result).unwrap(), &(x * c + b));
     }
 
@@ -527,7 +519,7 @@ mod tests {
 
         let mut inputs = HashMap::from([(input1, a), (input2, b)]);
 
-        solver(&system, &mut inputs).unwrap();
+        system.solve(&mut inputs).unwrap();
         assert_eq!(inputs.get(&result).unwrap(), &(a + b));
     }
 
@@ -544,7 +536,7 @@ mod tests {
 
         let mut inputs = HashMap::from([(input1, a), (input2, b)]);
 
-        solver(&system, &mut inputs).unwrap();
+        system.solve(&mut inputs).unwrap();
         assert_eq!(inputs.get(&result).unwrap(), &(a * b));
     }
 
@@ -561,7 +553,7 @@ mod tests {
 
         let mut inputs = HashMap::from([(input1, a), (input2, b)]);
 
-        solver(&system, &mut inputs).unwrap();
+        system.solve(&mut inputs).unwrap();
         assert_eq!(inputs.get(&result).unwrap(), &(a / b));
     }
 
@@ -577,7 +569,7 @@ mod tests {
 
         let mut inputs = HashMap::from([(input1, FieldElement::from(a))]);
 
-        solver(&system, &mut inputs).unwrap();
+        system.solve(&mut inputs).unwrap();
         assert_eq!(inputs.get(&result).unwrap(), &(a + b));
     }
 
@@ -591,9 +583,30 @@ mod tests {
 
         let mut inputs = HashMap::from([(boolean, FieldElement::one())]);
 
-        solver(&system, &mut inputs).unwrap();
+        system.solve(&mut inputs).unwrap();
         assert_eq!(inputs.get(&result1).unwrap(), &FieldElement::zero());
         assert_eq!(inputs.get(&result2).unwrap(), &FieldElement::one());
+    }
+
+    #[test]
+    fn test_inv() {
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let v = system.new_variable();
+        let w = system.new_variable();
+        let (v_is_zero, v_inverse) = system.inv(&v);
+        let (w_is_zero, w_inverse) = system.inv(&w);
+
+        let mut inputs = HashMap::from([(v, FieldElement::from(2)), (w, FieldElement::from(0))]);
+
+        system.solve(&mut inputs).unwrap();
+        assert_eq!(
+            inputs.get(&v_inverse).unwrap(),
+            &FieldElement::from(2).inv()
+        );
+        assert_eq!(inputs.get(&v_is_zero).unwrap(), &FieldElement::zero());
+        assert_eq!(inputs.get(&w_inverse).unwrap(), &FieldElement::from(0));
+        assert_eq!(inputs.get(&w_is_zero).unwrap(), &FieldElement::one());
     }
 
     // assert out == if(i1^2 + i1 * i2 + 5 != 0, i1, i2)
@@ -661,7 +674,7 @@ mod tests {
             (input2, FieldElement::from(2)),
         ]);
 
-        solver(&system, &mut inputs).unwrap();
+        system.solve(&mut inputs).unwrap();
     }
 
     /*
@@ -692,7 +705,7 @@ mod tests {
         let input_assignment = 13;
         let mut inputs = HashMap::from([(input, FieldElement::from(input_assignment))]);
 
-        solver(&system, &mut inputs).unwrap();
+        system.solve(&mut inputs).unwrap();
 
         for i in 0..32 {
             assert_eq!(
@@ -726,7 +739,7 @@ mod tests {
             (result_first_value, FieldElement::from(1)),
         ]);
 
-        solver(&system, &mut inputs).unwrap();
+        system.solve(&mut inputs).unwrap();
         assert_eq!(inputs.get(&result).unwrap(), &FieldElement::from(59049));
     }
 }
