@@ -21,6 +21,7 @@ enum Column {
     O,
 }
 
+#[allow(unused)]
 #[derive(Clone)]
 struct Hint<F: IsField> {
     function: fn(&FieldElement<F>) -> FieldElement<F>,
@@ -28,21 +29,25 @@ struct Hint<F: IsField> {
     output: Column,
 }
 
+#[allow(unused)]
+type Variable = usize;
+
+#[allow(unused)]
 struct PlonkConstraint<F: IsField> {
     constraint_type: ConstraintType<F>,
-    hint: Option<Hint<F>>, // func, input, output
-    l: usize,
-    r: usize,
-    o: usize,
+    hint: Option<Hint<F>>,
+    l: Variable,
+    r: Variable,
+    o: Variable,
 }
 
+#[allow(unused)]
 struct ConstraintSystem<F: IsField> {
     num_variables: usize,
     constraints: Vec<PlonkConstraint<F>>,
 }
 
-struct Variable(usize);
-
+#[allow(unused)]
 impl<F> ConstraintSystem<F>
 where
     F: IsField,
@@ -54,21 +59,21 @@ where
         }
     }
 
-    fn empty_wire(&self) -> usize {
+    fn null_variable(&self) -> Variable {
         0
     }
 
     fn new_variable(&mut self) -> Variable {
         let variable_id = self.num_variables;
         self.num_variables += 1;
-        Variable(variable_id)
+        variable_id
     }
 
     fn add_constraint(&mut self, constraint: PlonkConstraint<F>) {
         self.constraints.push(constraint);
     }
 
-    /// Generates a new variables `v = c1 * v1 + c2 * v2 + b`
+    /// Generates a new variable `v = c1 * v1 + c2 * v2 + b`
     fn linear_combination(
         &mut self,
         v1: &Variable,
@@ -87,15 +92,15 @@ where
                 qo: -FieldElement::one(),
                 qc: b,
             },
-            l: v1.0,
-            r: v2.0,
-            o: result.0,
-            hint: hint,
+            l: *v1,
+            r: *v2,
+            o: result,
+            hint,
         });
         result
     }
 
-    /// Generates a new variables `v = c1 * v1 + b`
+    /// Generates a new variables `w = c * v + b`
     fn linear_function(
         &mut self,
         v: &Variable,
@@ -105,15 +110,15 @@ where
         let result = self.new_variable();
         self.add_constraint(PlonkConstraint {
             constraint_type: ConstraintType {
-                ql: FieldElement::one(),
+                ql: c,
                 qr: FieldElement::zero(),
                 qm: FieldElement::zero(),
                 qo: -FieldElement::one(),
                 qc: b,
             },
-            l: v.0,
-            r: self.empty_wire(),
-            o: result.0,
+            l: *v,
+            r: self.null_variable(),
+            o: result,
             hint: None,
         });
         result
@@ -144,9 +149,9 @@ where
                 qo: -FieldElement::one(),
                 qc: FieldElement::zero(),
             },
-            l: v1.0,
-            r: v2.0,
-            o: result.0,
+            l: *v1,
+            r: *v2,
+            o: result,
             hint: None,
         });
         result
@@ -163,9 +168,9 @@ where
                 qo: -FieldElement::one(),
                 qc: FieldElement::zero(),
             },
-            l: result.0,
-            r: v2.0,
-            o: v1.0,
+            l: result,
+            r: *v2,
+            o: *v1,
             hint: None,
         });
         result
@@ -181,9 +186,9 @@ where
                 qo: FieldElement::zero(),
                 qc: FieldElement::zero(),
             },
-            l: boolean.0,
-            r: boolean.0,
-            o: self.empty_wire(),
+            l: boolean,
+            r: boolean,
+            o: self.null_variable(),
             hint: None,
         });
         boolean
@@ -218,12 +223,12 @@ where
             hint.clone(),
         );
         aux_vars.push(t_0);
-        for i in 2..32 {
+        for bit in bits.iter().take(32).skip(2) {
             // t_{i+1} := 2 t_i + b_i
             let t_i = self.linear_combination(
-                &aux_vars.last().unwrap(),
+                aux_vars.last().unwrap(),
                 FieldElement::from(2),
-                &bits[i],
+                bit,
                 FieldElement::one(),
                 FieldElement::zero(),
                 hint.clone(),
@@ -244,9 +249,9 @@ where
                 qo: FieldElement::zero(),
                 qc: -FieldElement::one(),
             },
-            l: v.0,
-            r: result.0,
-            o: self.empty_wire(),
+            l: *v,
+            r: result,
+            o: self.null_variable(),
             hint: None,
         });
         result
@@ -275,10 +280,10 @@ where
                 qo: FieldElement::zero(),
                 qc: FieldElement::zero(),
             },
-            l: v.0,
-            r: is_zero.0,
-            o: self.empty_wire(),
-            hint: hint,
+            l: *v,
+            r: is_zero,
+            o: self.null_variable(),
+            hint,
         });
         // v * w + z == 1
         self.add_constraint(PlonkConstraint {
@@ -289,9 +294,9 @@ where
                 qo: FieldElement::one(),
                 qc: -FieldElement::one(),
             },
-            l: v.0,
-            r: v_inverse.0, // w
-            o: is_zero.0,   // z
+            l: *v,
+            r: v_inverse, // w
+            o: is_zero,   // z
             hint: Some(Hint {
                 function: |v: &FieldElement<F>| {
                     if *v == FieldElement::zero() {
@@ -316,17 +321,17 @@ where
                 qo: FieldElement::zero(),
                 qc: FieldElement::zero(),
             },
-            l: v1.0,
-            r: v2.0,
-            o: self.empty_wire(),
+            l: *v1,
+            r: *v2,
+            o: self.null_variable(),
             hint: None,
         });
     }
 
     fn if_else(&mut self, boolean_condition: &Variable, v1: &Variable, v2: &Variable) -> Variable {
         let not_boolean_condition = self.not(boolean_condition);
-        let if_branch = self.mul(&v1, boolean_condition);
-        let else_branch = self.mul(&v2, &not_boolean_condition);
+        let if_branch = self.mul(v1, boolean_condition);
+        let else_branch = self.mul(v2, &not_boolean_condition);
         self.add(&if_branch, &else_branch)
     }
 
@@ -336,11 +341,10 @@ where
     }
 }
 
-
-
+#[allow(unused)]
 fn solver<F: IsField>(
     constraint_system: &ConstraintSystem<F>,
-    assignments: &mut HashMap<usize, FieldElement<F>>,
+    assignments: &mut HashMap<Variable, FieldElement<F>>,
 ) -> Result<(), ()> {
     let mut number_solved = 0;
     let mut checked_constraints = vec![false; constraint_system.constraints.len()];
@@ -437,7 +441,7 @@ fn solver<F: IsField>(
                 continue;
             }
             checked_constraints[i] = true;
-            number_solved = number_solved + 1;
+            number_solved += 1;
         }
         if number_solved == old_solved {
             break;
@@ -484,12 +488,12 @@ mod tests {
         let b = 10;
 
         let mut inputs = HashMap::from([
-            (input1.0, FieldElement::from(a)),
-            (input2.0, FieldElement::from(b)),
+            (input1, FieldElement::from(a)),
+            (input2, FieldElement::from(b)),
         ]);
 
         solver(&system, &mut inputs).unwrap();
-        assert_eq!(inputs.get(&result.0).unwrap(), &FieldElement::from(a + b));
+        assert_eq!(inputs.get(&result).unwrap(), &FieldElement::from(a + b));
     }
 
     #[test]
@@ -504,12 +508,12 @@ mod tests {
         let b = 11;
 
         let mut inputs = HashMap::from([
-            (input1.0, FieldElement::from(a)),
-            (input2.0, FieldElement::from(b)),
+            (input1, FieldElement::from(a)),
+            (input2, FieldElement::from(b)),
         ]);
 
         solver(&system, &mut inputs).unwrap();
-        assert_eq!(inputs.get(&result.0).unwrap(), &FieldElement::from(a * b));
+        assert_eq!(inputs.get(&result).unwrap(), &FieldElement::from(a * b));
     }
 
     #[test]
@@ -524,12 +528,12 @@ mod tests {
         let b = FieldElement::from(11);
 
         let mut inputs = HashMap::from([
-            (input1.0, FieldElement::from(a)),
-            (input2.0, FieldElement::from(b)),
+            (input1, FieldElement::from(a)),
+            (input2, FieldElement::from(b)),
         ]);
 
         solver(&system, &mut inputs).unwrap();
-        assert_eq!(inputs.get(&result.0).unwrap(), &(a / b));
+        assert_eq!(inputs.get(&result).unwrap(), &(a / b));
     }
 
     #[test]
@@ -542,10 +546,10 @@ mod tests {
 
         let a = FieldElement::from(3);
 
-        let mut inputs = HashMap::from([(input1.0, FieldElement::from(a))]);
+        let mut inputs = HashMap::from([(input1, FieldElement::from(a))]);
 
         solver(&system, &mut inputs).unwrap();
-        assert_eq!(inputs.get(&result.0).unwrap(), &(a + b));
+        assert_eq!(inputs.get(&result).unwrap(), &(a + b));
     }
 
     // assert out == if(i1^2 + i1 * i2 + 5 != 0, i1, i2)
@@ -608,12 +612,12 @@ mod tests {
         let z2 = system.mul(&z1, &input1);
         system.add_constant(&z2, FieldElement::from(5));
 
-        let mut inputs = HashMap::from([(0, FieldElement::one()), (1, FieldElement::from(2))]);
+        let mut inputs = HashMap::from([
+            (input1, FieldElement::one()),
+            (input2, FieldElement::from(2)),
+        ]);
 
         solver(&system, &mut inputs).unwrap();
-
-        // println!("Assignment");
-        // println!("{:?}", inputs);
     }
 
     /*
@@ -642,13 +646,13 @@ mod tests {
         let u32_var = system.new_u32(&input);
 
         let input_assignment = 13;
-        let mut inputs = HashMap::from([(0, FieldElement::from(input_assignment))]);
+        let mut inputs = HashMap::from([(input, FieldElement::from(input_assignment))]);
 
         solver(&system, &mut inputs).unwrap();
 
         for i in 0..32 {
             assert_eq!(
-                inputs.get(&u32_var[i].0).unwrap().representative(),
+                inputs.get(&u32_var[i]).unwrap().representative(),
                 (input_assignment >> (31 - i)) & 1
             );
         }
@@ -662,7 +666,7 @@ mod tests {
         let exponent = system.new_variable();
         let exponent_bits = system.new_u32(&exponent);
         let mut result = system.new_variable();
-        let result_first_value_id = result.0;
+        let result_first_value = result;
 
         assert_eq!(exponent_bits.len(), 32);
         for i in 0..32 {
@@ -673,13 +677,12 @@ mod tests {
             result = system.if_else(&exponent_bits[i], &result_times_base, &result);
         }
         let mut inputs = HashMap::from([
-            (base.0, FieldElement::from(3)),
-            (exponent.0, FieldElement::from(10)),
-            (result_first_value_id, FieldElement::from(1)),
+            (base, FieldElement::from(3)),
+            (exponent, FieldElement::from(10)),
+            (result_first_value, FieldElement::from(1)),
         ]);
 
         solver(&system, &mut inputs).unwrap();
-        assert_eq!(inputs.get(&result.0).unwrap(), &FieldElement::from(59049));
-        println!("{:?}", system.num_variables);
+        assert_eq!(inputs.get(&result).unwrap(), &FieldElement::from(59049));
     }
 }
