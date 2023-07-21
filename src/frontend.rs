@@ -663,7 +663,8 @@ mod tests {
         let kzg = KZG::new(srs);
         let verifying_key = setup(&common_preprocessed_input, &kzg);
 
-        // Generate witness and public inputs
+        // Prover:
+        // 1. Generate public inputs and witness
         let inputs = HashMap::from([
             (x, FieldElement::from(4)),
             (y, FieldElement::from(12)),
@@ -672,17 +673,17 @@ mod tests {
 
         let assignments = system.solve(inputs).unwrap();
         let public_inputs = {
-            let mut inputs_subset = Vec::new();
+            let mut public_inputs = Vec::new();
             for key in &system.public_input_variables {
                 if let Some(value) = assignments.get(&key) {
-                    inputs_subset.push(value.clone());
+                    public_inputs.push(value.clone());
                 }
             }
-            inputs_subset
+            public_inputs
         };
         let witness = Witness::new(&system, &assignments, common_preprocessed_input.n);
 
-        // Prove
+        // 2. Generate proof
         let random_generator = TestRandomFieldGenerator {};
         let prover = Prover::new(kzg.clone(), random_generator);
         let proof = prover.prove(
@@ -692,7 +693,7 @@ mod tests {
             &verifying_key,
         );
 
-        // Verify
+        // Verifier
         let verifier = Verifier::new(kzg);
         assert!(verifier.verify(
             &proof,
