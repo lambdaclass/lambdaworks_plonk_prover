@@ -336,7 +336,7 @@ where
         self.add(&if_branch, &else_branch)
     }
 
-    fn if_neq_else(&mut self, condition: &Variable, v1: &Variable, v2: &Variable) -> Variable {
+    fn if_nonzero_else(&mut self, condition: &Variable, v1: &Variable, v2: &Variable) -> Variable {
         let (is_zero, _) = self.inv(condition);
         self.if_else(&is_zero, v2, v1)
     }
@@ -647,94 +647,40 @@ mod tests {
         system.solve(&mut inputs).unwrap_err();
     }
 
-    // assert out == if(i1^2 + i1 * i2 + 5 != 0, i1, i2)
     #[test]
-    fn test_constraint_system() {
-        let system = &mut ConstraintSystem::<U64PrimeField<17>>::new();
+    fn test_if_nonzero_else_1() {
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
 
-        let input1 = system.new_variable();
-        let input2 = system.new_variable();
-        let output = system.new_variable();
+        let v = system.new_variable();
+        let v2 = system.mul(&v, &v);
+        let v4 = system.mul(&v2, &v2);
+        let w = system.add_constant(&v4, -FieldElement::one());
+        let output = system.if_nonzero_else(&w, &v, &v2);
 
-        let z1 = system.add(&input1, &input2);
-        let z2 = system.mul(&z1, &input1);
-        let z3 = system.add_constant(&z2, FieldElement::from(5));
-        let z4 = system.if_else(&z3, &input1, &input2);
-        system.assert_eq(&z4, &output);
-
-        println!("NUM WIRES: {}", system.num_variables);
-    }
-
-    /*
-        fn (input1, input2)
-            z1 = input1 + input2;
-            z2 = z1 * input1;
-            z3 = z2 + 5;
-
-        Constraints:
-        Ql Qr Qm Qo Qc
-         1  1  0 -1  0
-         0  0  1 -1  0
-         1  0  0 -1  5
-
-        Wirings:
-         A  B  C
-         0  1  2
-         0  2  3
-         3  0  4
-
-        Result:
-         A  B  C
-         1  2  3
-         1  3  3
-         3  0  8
-
-        Assignemnt:
-        0 -> 1
-        1 -> 2
-        2 -> 3
-        3 -> 3
-        4 -> 8
-    */
-    #[test]
-    fn test_solve_1() {
-        let system = &mut ConstraintSystem::<U64PrimeField<17>>::new();
-
-        let input1 = system.new_variable();
-        let input2 = system.new_variable();
-
-        let z1 = system.add(&input1, &input2);
-        let z2 = system.mul(&z1, &input1);
-        system.add_constant(&z2, FieldElement::from(5));
-
-        let mut inputs = HashMap::from([
-            (input1, FieldElement::one()),
-            (input2, FieldElement::from(2)),
-        ]);
+        let mut inputs = HashMap::from([(v, FieldElement::from(256))]);
 
         system.solve(&mut inputs).unwrap();
+        assert_eq!(inputs.get(&output).unwrap(), inputs.get(&v2).unwrap());
     }
 
-    /*
-        fn (input1, input2, output):
-            z1 = input1 + input2;
-            z2 = z1 * input1;
-            z3 = z2 + 5;
-            z4 = z3 != 0? input1 : input2;
-            z4 == output;
+    #[test]
+    fn test_if_nonzero_else_2() {
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
 
-        Assigment:
-            0 -> input1 -> 2
-            1 -> input2 -> 3
-            2 -> z1     -> 5
-            3 -> z2     -> 10
-            4 -> z3     -> 15
-            5 -> z4     ->    ?? Acá ya agrega más vars internamente
+        let v = system.new_variable();
+        let v2 = system.mul(&v, &v);
+        let v4 = system.mul(&v2, &v2);
+        let w = system.add_constant(&v4, -FieldElement::one());
+        let output = system.if_nonzero_else(&w, &v, &v2);
 
-    */
+        let mut inputs = HashMap::from([(v, FieldElement::from(255))]);
+
+        system.solve(&mut inputs).unwrap();
+        assert_eq!(inputs.get(&output).unwrap(), inputs.get(&v).unwrap());
+    }
 
     #[test]
-    fn test_solve_u32() {
+    fn test_u32() {
         let system = &mut ConstraintSystem::<U64PrimeField<17>>::new();
 
         let input = system.new_variable();

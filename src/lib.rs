@@ -1,5 +1,5 @@
+pub mod frontend;
 pub mod prover;
 pub mod setup;
 pub mod test_utils;
 pub mod verifier;
-pub mod frontend;
