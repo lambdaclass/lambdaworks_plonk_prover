@@ -69,6 +69,24 @@ where
         variable_id
     }
 
+    fn new_constant(&mut self, value: FieldElement<F>) -> Variable {
+        let constant = self.new_variable();
+        self.add_constraint(PlonkConstraint {
+            constraint_type: ConstraintType {
+                ql: -FieldElement::one(),
+                qr: FieldElement::zero(),
+                qm: FieldElement::zero(),
+                qo: FieldElement::zero(),
+                qc: value,
+            },
+            l: constant,
+            r: self.null_variable(),
+            o: self.null_variable(),
+            hint: None,
+        });
+        constant
+    }
+
     fn add_constraint(&mut self, constraint: PlonkConstraint<F>) {
         self.constraints.push(constraint);
     }
@@ -348,9 +366,9 @@ where
             let old_solved = number_solved;
             for (i, constraint) in self.constraints.iter().enumerate() {
                 let ct = &constraint.constraint_type;
-                let has_l = assignments.contains_key(&constraint.l);
-                let has_r = assignments.contains_key(&constraint.r);
-                let has_o = assignments.contains_key(&constraint.o);
+                let mut has_l = assignments.contains_key(&constraint.l);
+                let mut has_r = assignments.contains_key(&constraint.r);
+                let mut has_o = assignments.contains_key(&constraint.o);
 
                 if let Some(hint) = &constraint.hint {
                     let function = hint.function;
@@ -361,12 +379,14 @@ where
                                 function(assignments.get(&constraint.l).unwrap()),
                             );
                             number_solved += 1;
+                            has_r = true;
                         }
                         (Column::L, Column::O, true, _, false) => {
                             assignments.insert(
                                 constraint.o,
                                 function(assignments.get(&constraint.l).unwrap()),
                             );
+                            has_o = true;
                             number_solved += 1;
                         }
                         (Column::R, Column::L, false, true, _) => {
@@ -374,6 +394,7 @@ where
                                 constraint.l,
                                 function(assignments.get(&constraint.r).unwrap()),
                             );
+                            has_l = true;
                             number_solved += 1;
                         }
                         (Column::R, Column::O, _, true, false) => {
@@ -381,6 +402,7 @@ where
                                 constraint.o,
                                 function(assignments.get(&constraint.r).unwrap()),
                             );
+                            has_o = true;
                             number_solved += 1;
                         }
                         (Column::O, Column::L, false, _, true) => {
@@ -388,6 +410,7 @@ where
                                 constraint.l,
                                 function(assignments.get(&constraint.o).unwrap()),
                             );
+                            has_l = true;
                             number_solved += 1;
                         }
                         (Column::O, Column::R, _, false, true) => {
@@ -395,6 +418,7 @@ where
                                 constraint.r,
                                 function(assignments.get(&constraint.o).unwrap()),
                             );
+                            has_r = true;
                             number_solved += 1;
                         }
                         _ => {}
@@ -605,6 +629,7 @@ mod tests {
             &FieldElement::from(2).inv()
         );
         assert_eq!(inputs.get(&v_is_zero).unwrap(), &FieldElement::zero());
+
         assert_eq!(inputs.get(&w_inverse).unwrap(), &FieldElement::from(0));
         assert_eq!(inputs.get(&w_is_zero).unwrap(), &FieldElement::one());
     }
@@ -706,8 +731,7 @@ mod tests {
         let base = system.new_variable();
         let exponent = system.new_variable();
         let exponent_bits = system.new_u32(&exponent);
-        let mut result = system.new_variable();
-        let result_first_value = result;
+        let mut result = system.new_constant(FieldElement::one());
 
         assert_eq!(exponent_bits.len(), 32);
         for i in 0..32 {
@@ -720,7 +744,6 @@ mod tests {
         let mut inputs = HashMap::from([
             (base, FieldElement::from(3)),
             (exponent, FieldElement::from(10)),
-            (result_first_value, FieldElement::from(1)),
         ]);
 
         system.solve(&mut inputs).unwrap();
