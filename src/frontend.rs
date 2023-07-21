@@ -681,20 +681,20 @@ mod tests {
 
     #[test]
     fn test_u32() {
-        let system = &mut ConstraintSystem::<U64PrimeField<17>>::new();
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
 
         let input = system.new_variable();
         let u32_var = system.new_u32(&input);
 
-        let input_assignment = 13;
-        let mut inputs = HashMap::from([(input, FieldElement::from(input_assignment))]);
+        let a = 59049;
+        let mut inputs = HashMap::from([(input, FieldElement::from(a))]);
 
         system.solve(&mut inputs).unwrap();
 
         for i in 0..32 {
             assert_eq!(
                 inputs.get(&u32_var[i]).unwrap().representative(),
-                (input_assignment >> (31 - i)) & 1
+                (a >> (31 - i)) & 1
             );
         }
     }
