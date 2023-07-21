@@ -581,6 +581,21 @@ mod tests {
         assert_eq!(inputs.get(&result).unwrap(), &(a + b));
     }
 
+    #[test]
+    fn test_not() {
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let boolean = system.new_boolean();
+        let result1 = system.not(&boolean);
+        let result2 = system.not(&result1);
+
+        let mut inputs = HashMap::from([(boolean, FieldElement::one())]);
+
+        solver(&system, &mut inputs).unwrap();
+        assert_eq!(inputs.get(&result1).unwrap(), &FieldElement::zero());
+        assert_eq!(inputs.get(&result2).unwrap(), &FieldElement::one());
+    }
+
     // assert out == if(i1^2 + i1 * i2 + 5 != 0, i1, i2)
     #[test]
     fn test_constraint_system() {
