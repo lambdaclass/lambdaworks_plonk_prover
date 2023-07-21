@@ -13,7 +13,6 @@ struct ConstraintType<F: IsField> {
     qc: FieldElement<F>,
 }
 
-// a Ql + b Qr + a b Qm + c Qo + Qc = 0
 #[derive(Clone)]
 enum Column {
     L,
@@ -33,7 +32,7 @@ struct Hint<F: IsField> {
 type Variable = usize;
 
 #[allow(unused)]
-struct PlonkConstraint<F: IsField> {
+struct Constraint<F: IsField> {
     constraint_type: ConstraintType<F>,
     hint: Option<Hint<F>>,
     l: Variable,
@@ -41,10 +40,59 @@ struct PlonkConstraint<F: IsField> {
     o: Variable,
 }
 
+impl<F: IsField> Constraint<F> {
+    fn linear_combination(
+        l: &Variable,
+        r: &Variable,
+        o: &Variable,
+        c1: FieldElement<F>,
+        c2: FieldElement<F>,
+        b: FieldElement<F>,
+        hint: Option<Hint<F>>,
+    ) -> Self {
+        Self {
+            constraint_type: ConstraintType {
+                ql: c1,
+                qr: c2,
+                qm: FieldElement::zero(),
+                qo: -FieldElement::one(),
+                qc: b,
+            },
+            l: *l,
+            r: *r,
+            o: *o,
+            hint,
+        }
+    }
+
+    fn linear_function(
+        l: &Variable,
+        r: &Variable,
+        o: &Variable,
+        c: FieldElement<F>,
+        b: FieldElement<F>,
+        hint: Option<Hint<F>>,
+    ) -> Self {
+        Self {
+            constraint_type: ConstraintType {
+                ql: c,
+                qr: FieldElement::zero(),
+                qm: FieldElement::zero(),
+                qo: -FieldElement::one(),
+                qc: b,
+            },
+            l: *l,
+            r: *r,
+            o: *o,
+            hint,
+        }
+    }
+}
+
 #[allow(unused)]
 struct ConstraintSystem<F: IsField> {
     num_variables: usize,
-    constraints: Vec<PlonkConstraint<F>>,
+    constraints: Vec<Constraint<F>>,
 }
 
 #[allow(unused)]
@@ -71,7 +119,7 @@ where
 
     fn new_constant(&mut self, value: FieldElement<F>) -> Variable {
         let constant = self.new_variable();
-        self.add_constraint(PlonkConstraint {
+        self.add_constraint(Constraint {
             constraint_type: ConstraintType {
                 ql: -FieldElement::one(),
                 qr: FieldElement::zero(),
@@ -87,7 +135,7 @@ where
         constant
     }
 
-    fn add_constraint(&mut self, constraint: PlonkConstraint<F>) {
+    fn add_constraint(&mut self, constraint: Constraint<F>) {
         self.constraints.push(constraint);
     }
 
@@ -102,19 +150,9 @@ where
         hint: Option<Hint<F>>,
     ) -> Variable {
         let result = self.new_variable();
-        self.add_constraint(PlonkConstraint {
-            constraint_type: ConstraintType {
-                ql: c1,
-                qr: c2,
-                qm: FieldElement::zero(),
-                qo: -FieldElement::one(),
-                qc: b,
-            },
-            l: *v1,
-            r: *v2,
-            o: result,
-            hint,
-        });
+        self.add_constraint(Constraint::linear_combination(
+            v1, v2, &result, c1, c2, b, hint,
+        ));
         result
     }
 
@@ -127,19 +165,14 @@ where
         hint: Option<Hint<F>>,
     ) -> Variable {
         let result = self.new_variable();
-        self.add_constraint(PlonkConstraint {
-            constraint_type: ConstraintType {
-                ql: c,
-                qr: FieldElement::zero(),
-                qm: FieldElement::zero(),
-                qo: -FieldElement::one(),
-                qc: b,
-            },
-            l: *v,
-            r: self.null_variable(),
-            o: result,
+        self.add_constraint(Constraint::linear_function(
+            v,
+            &self.null_variable(),
+            &result,
+            c,
+            b,
             hint,
-        });
+        ));
         result
     }
 
@@ -160,7 +193,7 @@ where
 
     fn mul(&mut self, v1: &Variable, v2: &Variable) -> Variable {
         let result = self.new_variable();
-        self.add_constraint(PlonkConstraint {
+        self.add_constraint(Constraint {
             constraint_type: ConstraintType {
                 ql: FieldElement::zero(),
                 qr: FieldElement::zero(),
@@ -179,7 +212,7 @@ where
     // TODO: check 0.div(0) does not compile
     fn div(&mut self, v1: &Variable, v2: &Variable) -> Variable {
         let result = self.new_variable();
-        self.add_constraint(PlonkConstraint {
+        self.add_constraint(Constraint {
             constraint_type: ConstraintType {
                 ql: FieldElement::zero(),
                 qr: FieldElement::zero(),
@@ -197,7 +230,7 @@ where
 
     fn new_boolean(&mut self) -> Variable {
         let boolean = self.new_variable();
-        self.add_constraint(PlonkConstraint {
+        self.add_constraint(Constraint {
             constraint_type: ConstraintType {
                 ql: -FieldElement::one(),
                 qr: FieldElement::zero(),
@@ -260,7 +293,7 @@ where
 
     fn not(&mut self, v: &Variable) -> Variable {
         let result = self.new_variable();
-        self.add_constraint(PlonkConstraint {
+        self.add_constraint(Constraint {
             constraint_type: ConstraintType {
                 ql: FieldElement::one(),
                 qr: FieldElement::one(),
@@ -291,7 +324,7 @@ where
             output: Column::R,
         });
         // v * z == 0
-        self.add_constraint(PlonkConstraint {
+        self.add_constraint(Constraint {
             constraint_type: ConstraintType {
                 ql: FieldElement::zero(),
                 qr: FieldElement::zero(),
@@ -305,7 +338,7 @@ where
             hint,
         });
         // v * w + z == 1
-        self.add_constraint(PlonkConstraint {
+        self.add_constraint(Constraint {
             constraint_type: ConstraintType {
                 ql: FieldElement::zero(),
                 qr: FieldElement::zero(),
@@ -332,7 +365,7 @@ where
     }
 
     fn assert_eq(&mut self, v1: &Variable, v2: &Variable) {
-        self.add_constraint(PlonkConstraint {
+        self.add_constraint(Constraint {
             constraint_type: ConstraintType {
                 ql: FieldElement::one(),
                 qr: -FieldElement::one(),
