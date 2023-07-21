@@ -908,26 +908,39 @@ mod tests {
             .collect();
 
         let system = &mut ConstraintSystem::<FrField>::new();
-        let data = vec![system.new_variable()];
+        let mut data = vec![system.new_variable()];
 
         let mut h = system.new_constant(FieldElement::zero());
 
-        for stream in data.iter() {
-            let mut x = system.new_variable();
-            system.assert_eq(&x, stream);
+        for stream in data.iter_mut() {
+            let mut x = *stream;
             for c in coefficients.iter() {
                 // x = (x + h + c) ** 5
-                x = system.add(&x, &h);
-                x = system.add_constant(&x, c.clone());
+                x = system.linear_combination(
+                    &x,
+                    FieldElement::one(),
+                    &h,
+                    FieldElement::one(),
+                    c.clone(),
+                    None,
+                );
                 let x_pow_2 = system.mul(&x, &x);
                 let x_pow_4 = system.mul(&x_pow_2, &x_pow_2);
                 x = system.mul(&x_pow_4, &x);
             }
-            // r = y + h
-            let r = system.add(&x, &h);
-            h = system.add(&h, &r);
+            // h = x + 2h + stream
+            h = system.linear_combination(
+                &x,
+                FieldElement::one(),
+                &h,
+                FieldElement::from(2),
+                FieldElement::zero(),
+                None,
+            );
             h = system.add(&h, &stream);
         }
+        let output = system.new_variable();
+        system.assert_eq(&h, &output);
         let mut inputs = HashMap::from([
             (
                 data[0],
@@ -936,13 +949,13 @@ mod tests {
                 )
                 .unwrap(),
             ),
-            // (
-            //     h,
-            //     FieldElement::from_hex(
-            //         "136ff6a4e5fc9a2103cc54252d93c3be07f781dc4405acd9447bee65cfdc7c14",
-            //     )
-            //     .unwrap(),
-            // ),
+            (
+                output,
+                FieldElement::from_hex(
+                    "136ff6a4e5fc9a2103cc54252d93c3be07f781dc4405acd9447bee65cfdc7c14",
+                )
+                .unwrap(),
+            ),
         ]);
         system.solve(&mut inputs).unwrap();
         println!("{}", system.num_variables);
