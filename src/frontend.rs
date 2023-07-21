@@ -410,7 +410,7 @@ where
                 qr: zero.clone(),
                 qm: zero.clone(),
                 qo: zero.clone(),
-                qc: zero.clone(),
+                qc: zero,
             },
             hint: None,
             l: self.null_variable(),
@@ -548,7 +548,7 @@ where
                 }
             }
         }
-        Ok((assignments))
+        Ok(assignments)
     }
 
     pub fn public_input_header(&self) -> Vec<Constraint<F>> {
@@ -565,7 +565,7 @@ where
                     qc: zero.clone(),
                 },
                 hint: None,
-                l: public_input.clone(),
+                l: *public_input,
                 r: self.null_variable(),
                 o: self.null_variable(),
             };
@@ -576,20 +576,9 @@ where
 }
 
 pub fn get_permutation(lro: &[Variable]) -> Vec<usize> {
-
-    // let n_constraints = lro.len();
-    // let mut lro = vec![constraint_system.null_variable(); n_constraints * 3];
-    //
-    // // Make a single vector with | a_1 .. a_m | b_1 .. b_m | c_1 .. c_m | concatenated.
-    // for (index, constraint) in constraint_system.constraints.iter().enumerate() {
-    //     lro[index] = constraint.l;
-    //     lro[index + n_constraints] = constraint.r;
-    //     lro[index + n_constraints * 2] = constraint.o;
-    // }
-
     // For each variable store the indexes where it appears.
     let mut last_usage: HashMap<Variable, usize> = HashMap::new();
-    let mut permutation = vec![0 as usize; lro.len()];
+    let mut permutation = vec![0_usize; lro.len()];
 
     for _ in 0..2 {
         for (index, variable) in lro.iter().enumerate() {
@@ -609,7 +598,7 @@ mod tests {
         prover::Prover,
         setup::{setup, CommonPreprocessedInput, Witness},
         test_utils::utils::{
-            test_srs, FpField, TestRandomFieldGenerator, KZG, ORDER_R_MINUS_1_ROOT_UNITY,
+            test_srs, TestRandomFieldGenerator, KZG, ORDER_R_MINUS_1_ROOT_UNITY,
         },
         verifier::Verifier,
     };
@@ -653,7 +642,6 @@ mod tests {
     //     let expected = vec![4, 3, 6, 1, 0, 7, 2, 5, 8];
     //     assert_eq!(expected, permutation);
     // }
-
 
     #[test]
     fn test_prove_simple_program_1() {
@@ -728,7 +716,7 @@ mod tests {
         let x = FieldElement::from(17);
         let y = FieldElement::from(29);
 
-        let mut inputs = HashMap::from([(v1, x), (v2, y)]);
+        let inputs = HashMap::from([(v1, x), (v2, y)]);
 
         let assignments = system.solve(inputs).unwrap();
         assert_eq!(assignments.get(&result).unwrap(), &(x * c1 + y * c2 + b));
@@ -745,7 +733,7 @@ mod tests {
 
         let x = FieldElement::from(17);
 
-        let mut inputs = HashMap::from([(v, x)]);
+        let inputs = HashMap::from([(v, x)]);
 
         let assignments = system.solve(inputs).unwrap();
         assert_eq!(assignments.get(&result).unwrap(), &(x * c + b));
@@ -762,7 +750,7 @@ mod tests {
         let a = FieldElement::from(3);
         let b = FieldElement::from(10);
 
-        let mut inputs = HashMap::from([(input1, a), (input2, b)]);
+        let inputs = HashMap::from([(input1, a), (input2, b)]);
 
         let assignments = system.solve(inputs).unwrap();
         assert_eq!(assignments.get(&result).unwrap(), &(a + b));
@@ -779,7 +767,7 @@ mod tests {
         let a = FieldElement::from(3);
         let b = FieldElement::from(11);
 
-        let mut inputs = HashMap::from([(input1, a), (input2, b)]);
+        let inputs = HashMap::from([(input1, a), (input2, b)]);
 
         let assignments = system.solve(inputs).unwrap();
         assert_eq!(assignments.get(&result).unwrap(), &(a * b));
@@ -796,7 +784,7 @@ mod tests {
         let a = FieldElement::from(3);
         let b = FieldElement::from(11);
 
-        let mut inputs = HashMap::from([(input1, a), (input2, b)]);
+        let inputs = HashMap::from([(input1, a), (input2, b)]);
 
         let assignments = system.solve(inputs).unwrap();
         assert_eq!(assignments.get(&result).unwrap(), &(a / b));
@@ -812,7 +800,7 @@ mod tests {
 
         let a = FieldElement::from(3);
 
-        let mut inputs = HashMap::from([(input1, FieldElement::from(a))]);
+        let inputs = HashMap::from([(input1, FieldElement::from(a))]);
 
         let assignments = system.solve(inputs).unwrap();
         assert_eq!(assignments.get(&result).unwrap(), &(a + b));
@@ -826,7 +814,7 @@ mod tests {
         let result1 = system.not(&boolean);
         let result2 = system.not(&result1);
 
-        let mut inputs = HashMap::from([(boolean, FieldElement::one())]);
+        let inputs = HashMap::from([(boolean, FieldElement::one())]);
 
         let assignments = system.solve(inputs).unwrap();
         assert_eq!(assignments.get(&result1).unwrap(), &FieldElement::zero());
@@ -842,7 +830,7 @@ mod tests {
         let (v_is_zero, v_inverse) = system.inv(&v);
         let (w_is_zero, w_inverse) = system.inv(&w);
 
-        let mut inputs = HashMap::from([(v, FieldElement::from(2)), (w, FieldElement::from(0))]);
+        let inputs = HashMap::from([(v, FieldElement::from(2)), (w, FieldElement::from(0))]);
 
         let assignments = system.solve(inputs).unwrap();
         assert_eq!(
@@ -865,13 +853,13 @@ mod tests {
         let output = system.new_variable();
         system.assert_eq(&z, &output);
 
-        let mut inputs = HashMap::from([
+        let inputs = HashMap::from([
             (v, FieldElement::from(2)),
             (w, FieldElement::from(2).inv()),
-            (output, FieldElement::from(1)),
         ]);
 
         let assignments = system.solve(inputs).unwrap();
+        assert_eq!(assignments.get(&output).unwrap(), &FieldElement::one());
     }
 
     #[test]
@@ -884,13 +872,13 @@ mod tests {
         let output = system.new_variable();
         system.assert_eq(&z, &output);
 
-        let mut inputs = HashMap::from([
+        let inputs = HashMap::from([
             (v, FieldElement::from(2)),
             (w, FieldElement::from(2)),
             (output, FieldElement::from(1)),
         ]);
 
-        let assignments = system.solve(inputs).unwrap_err();
+        let _assignments = system.solve(inputs).unwrap_err();
     }
 
     #[test]
@@ -903,10 +891,13 @@ mod tests {
         let w = system.add_constant(&v4, -FieldElement::one());
         let output = system.if_nonzero_else(&w, &v, &v2);
 
-        let mut inputs = HashMap::from([(v, FieldElement::from(256))]);
+        let inputs = HashMap::from([(v, FieldElement::from(256))]);
 
         let assignments = system.solve(inputs).unwrap();
-        assert_eq!(assignments.get(&output).unwrap(), assignments.get(&v2).unwrap());
+        assert_eq!(
+            assignments.get(&output).unwrap(),
+            assignments.get(&v2).unwrap()
+        );
     }
 
     #[test]
@@ -919,10 +910,13 @@ mod tests {
         let w = system.add_constant(&v4, -FieldElement::one());
         let output = system.if_nonzero_else(&w, &v, &v2);
 
-        let mut inputs = HashMap::from([(v, FieldElement::from(255))]);
+        let inputs = HashMap::from([(v, FieldElement::from(255))]);
 
         let assignments = system.solve(inputs).unwrap();
-        assert_eq!(assignments.get(&output).unwrap(), assignments.get(&v).unwrap());
+        assert_eq!(
+            assignments.get(&output).unwrap(),
+            assignments.get(&v).unwrap()
+        );
     }
 
     #[test]
@@ -933,7 +927,7 @@ mod tests {
         let u32_var = system.new_u32(&input);
 
         let a = 59049;
-        let mut inputs = HashMap::from([(input, FieldElement::from(a))]);
+        let inputs = HashMap::from([(input, FieldElement::from(a))]);
 
         let assignments = system.solve(inputs).unwrap();
 
@@ -962,13 +956,16 @@ mod tests {
             let result_times_base = system.mul(&result, &base);
             result = system.if_else(&exponent_bits[i], &result_times_base, &result);
         }
-        let mut inputs = HashMap::from([
+        let inputs = HashMap::from([
             (base, FieldElement::from(3)),
             (exponent, FieldElement::from(10)),
         ]);
 
         let assignments = system.solve(inputs).unwrap();
-        assert_eq!(assignments.get(&result).unwrap(), &FieldElement::from(59049));
+        assert_eq!(
+            assignments.get(&result).unwrap(),
+            &FieldElement::from(59049)
+        );
     }
 
     #[test]
@@ -1126,24 +1123,21 @@ mod tests {
         }
         let output = system.new_variable();
         system.assert_eq(&h, &output);
-        let mut inputs = HashMap::from([
-            (
-                data[0],
-                FieldElement::from_hex(
-                    "23a950068dd3d1e21cee48e7919be7ae32cdef70311fc486336ea9d4b5042535",
-                )
-                .unwrap(),
-            ),
-            (
-                output,
-                FieldElement::from_hex(
-                    "136ff6a4e5fc9a2103cc54252d93c3be07f781dc4405acd9447bee65cfdc7c14",
-                )
-                .unwrap(),
-            ),
-        ]);
+
+        let inputs = HashMap::from([(
+            data[0],
+            FieldElement::from_hex(
+                "23a950068dd3d1e21cee48e7919be7ae32cdef70311fc486336ea9d4b5042535",
+            )
+            .unwrap(),
+        )]);
+
+        let expected_output_value = FieldElement::from_hex(
+            "136ff6a4e5fc9a2103cc54252d93c3be07f781dc4405acd9447bee65cfdc7c14",
+        )
+        .unwrap();
+
         let assignments = system.solve(inputs).unwrap();
-        println!("{}", system.num_variables);
-        println!("{}", system.constraints.len());
+        assert_eq!(assignments.get(&output).unwrap(), &expected_output_value);
     }
 }

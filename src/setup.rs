@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::frontend::{get_permutation, ConstraintSystem, Variable};
 use crate::test_utils::utils::{
-    generate_domain, generate_permutation_coefficients, ORDER_R_MINUS_1_ROOT_UNITY,
+    generate_domain, generate_permutation_coefficients,
 };
 use lambdaworks_crypto::commitments::traits::IsCommitmentScheme;
 use lambdaworks_crypto::fiat_shamir::default_transcript::DefaultTranscript;
@@ -89,10 +89,11 @@ impl<F: IsFFTField> CommonPreprocessedInput<F> {
         let header = system.public_input_header();
         let body = &system.constraints;
         let total_length = (header.len() + body.len()).next_power_of_two();
-        let pad = vec![system.padding_constraint().clone(); total_length - header.len() - body.len()];
+        let pad =
+            vec![system.padding_constraint(); total_length - header.len() - body.len()];
 
         let mut full_constraints = header;
-        full_constraints.extend_from_slice(&body);
+        full_constraints.extend_from_slice(body);
         full_constraints.extend_from_slice(&pad);
 
         let n = full_constraints.len();
@@ -133,9 +134,9 @@ impl<F: IsFFTField> CommonPreprocessedInput<F> {
         }
 
         Self {
-            domain: domain,
+            domain,
             n,
-            omega: omega,
+            omega,
             k1: order_r_minus_1_root_unity.clone(),
             ql: Polynomial::interpolate_fft(&ql).unwrap(), // TODO: Remove unwraps
             qr: Polynomial::interpolate_fft(&qr).unwrap(),
