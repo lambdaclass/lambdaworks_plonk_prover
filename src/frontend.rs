@@ -407,16 +407,40 @@ where
         let minus_one = -FieldElement::one();
         let mut public_input_constraints = Vec::new();
         for public_input in self.public_input_variables.iter() {
-            let public_input_constraint =  Constraint { constraint_type: ConstraintType { ql: minus_one.clone(), qr: zero.clone(), qm: zero.clone(), qo: zero.clone(), qc: zero.clone() }, hint: None, l: public_input.clone(), r: self.null_variable(), o: self.null_variable() };
+            let public_input_constraint = Constraint {
+                constraint_type: ConstraintType {
+                    ql: minus_one.clone(),
+                    qr: zero.clone(),
+                    qm: zero.clone(),
+                    qo: zero.clone(),
+                    qc: zero.clone(),
+                },
+                hint: None,
+                l: public_input.clone(),
+                r: self.null_variable(),
+                o: self.null_variable(),
+            };
             public_input_constraints.push(public_input_constraint);
         }
         public_input_constraints.append(&mut self.constraints);
-        self.constraints = public_input_constraints; 
+        self.constraints = public_input_constraints;
     }
-    
+
     pub fn pad(&mut self) {
         let zero = FieldElement::zero();
-        let null_constraint = Constraint { constraint_type: ConstraintType { ql: zero.clone(), qr: zero.clone(), qm: zero.clone(), qo: zero.clone(), qc: zero.clone() }, hint: None, l: self.null_variable(), r: self.null_variable(), o: self.null_variable() };
+        let null_constraint = Constraint {
+            constraint_type: ConstraintType {
+                ql: zero.clone(),
+                qr: zero.clone(),
+                qm: zero.clone(),
+                qo: zero.clone(),
+                qc: zero.clone(),
+            },
+            hint: None,
+            l: self.null_variable(),
+            r: self.null_variable(),
+            o: self.null_variable(),
+        };
         let pad = self.constraints.len().next_power_of_two() - self.constraints.len();
         for _ in 0..pad {
             self.constraints.push(null_constraint.clone());
@@ -582,7 +606,14 @@ pub fn get_permutation<F: IsField>(constraint_system: &ConstraintSystem<F>) -> V
 
 #[cfg(test)]
 mod tests {
-    use crate::{setup::{CommonPreprocessedInput, Witness, setup}, test_utils::utils::{ORDER_R_MINUS_1_ROOT_UNITY, FpField, test_srs, KZG, TestRandomFieldGenerator}, prover::Prover, verifier::Verifier};
+    use crate::{
+        prover::Prover,
+        setup::{setup, CommonPreprocessedInput, Witness},
+        test_utils::utils::{
+            test_srs, FpField, TestRandomFieldGenerator, KZG, ORDER_R_MINUS_1_ROOT_UNITY,
+        },
+        verifier::Verifier,
+    };
 
     use super::*;
     use lambdaworks_math::{
@@ -598,8 +629,8 @@ mod tests {
     v3 = v1 + v0
     v4 = v2 + v3
 
-    Wirings:
-    A  B  C
+    Variables:
+    L  R  O
     0  1  2
     1  0  3
     2  3  4
@@ -614,10 +645,10 @@ mod tests {
 
         let v0 = system.new_variable();
         let v1 = system.new_variable();
-        
+
         let v2 = system.add(&v0, &v1);
         let v3 = system.add(&v1, &v0);
-        let v4 = system.add(&v2, &v3);
+        system.add(&v2, &v3);
 
         let permutation = get_permutation(&system);
         let expected = vec![4, 3, 6, 1, 0, 7, 2, 5, 8];
@@ -625,24 +656,30 @@ mod tests {
     }
 
     #[test]
-    fn test_prove_simple_program() {
+    fn test_prove_simple_program_1() {
         let system = &mut ConstraintSystem::<FrField>::new();
 
-        let v0 = system.new_public_input();
-        let v1 = system.new_public_input();
-        
-        let v2 = system.add(&v0, &v1);
-        let v3 = system.mul(&v1, &v0);
-        let v4 = system.add_constant(&v2, FieldElement::one());
+        let e = system.new_variable();
+        let x = system.new_public_input();
+        let y = system.new_public_input();
 
-        let public_input = [FieldElement::from(2), FieldElement::from(2)];
-        let mut inputs = HashMap::from([(v0, public_input[0].clone()), (v1, public_input[1].clone())]);
+        let z = system.mul(&x, &e);
+        system.assert_eq(&y, &z);
+
+        let public_input = [FieldElement::from(4), FieldElement::from(12)];
+
+        let mut inputs = HashMap::from([
+            (x, public_input[0].clone()),
+            (y, public_input[1].clone()),
+            (e, FieldElement::from(3)),
+        ]);
         let witness = Witness::solving(&system, &mut inputs);
 
         system.add_public_input_header();
         system.pad();
 
-        let common_preprocessed_input = CommonPreprocessedInput::from_constraint_system(&system, &ORDER_R_MINUS_1_ROOT_UNITY);
+        let common_preprocessed_input =
+            CommonPreprocessedInput::from_constraint_system(&system, &ORDER_R_MINUS_1_ROOT_UNITY);
         let srs = test_srs(common_preprocessed_input.n);
 
         let kzg = KZG::new(srs);
@@ -665,7 +702,6 @@ mod tests {
             &verifying_key
         ));
     }
-
 
     #[test]
     fn test_linear_combination() {

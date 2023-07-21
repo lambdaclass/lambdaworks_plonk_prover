@@ -75,7 +75,7 @@ pub struct CommonPreprocessedInput<F: IsField> {
 impl<F: IsFFTField> CommonPreprocessedInput<F> {
     pub fn from_constraint_system(system: &ConstraintSystem<F>, order_r_minus_1_root_unity: &FieldElement<F>) -> Self {
         let n = system.constraints.len();
-        let omega = F::get_primitive_root_of_unity(2).unwrap();
+        let omega = F::get_primitive_root_of_unity(n.trailing_zeros() as u64).unwrap();
         let domain = generate_domain(&omega, n);
         let permutation = get_permutation(&system);
         let permuted = generate_permutation_coefficients(&omega, n, &permutation, order_r_minus_1_root_unity);
