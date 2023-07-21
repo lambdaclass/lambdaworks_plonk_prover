@@ -477,6 +477,28 @@ mod tests {
     use super::*;
     use lambdaworks_math::field::{element::FieldElement, fields::u64_prime_field::U64PrimeField};
     #[test]
+    fn test_linear_combination() {
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let v1 = system.new_variable();
+        let c1 = FieldElement::from(15);
+        let v2 = system.new_variable();
+        let c2 = -FieldElement::from(7);
+        let b = FieldElement::from(99);
+        let result = system.linear_combination(&v1, c1, &v2, c2, b, None);
+
+        let x = FieldElement::from(17);
+        let y = FieldElement::from(29);
+
+        let mut inputs = HashMap::from([
+            (v1, x),
+            (v2, y),
+        ]);
+
+        solver(&system, &mut inputs).unwrap();
+        assert_eq!(inputs.get(&result).unwrap(), &FieldElement::from(x * c1 + y * c2 + b));
+    }
+    #[test]
     fn test_add() {
         let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
 
