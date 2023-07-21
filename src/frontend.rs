@@ -609,6 +609,44 @@ mod tests {
         assert_eq!(inputs.get(&w_is_zero).unwrap(), &FieldElement::one());
     }
 
+    #[test]
+    fn test_assert_eq_1() {
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let v = system.new_variable();
+        let w = system.new_variable();
+        let z = system.mul(&v, &w);
+        let output = system.new_variable();
+        system.assert_eq(&z, &output);
+
+        let mut inputs = HashMap::from([
+            (v, FieldElement::from(2)),
+            (w, FieldElement::from(2).inv()),
+            (output, FieldElement::from(1)),
+        ]);
+
+        system.solve(&mut inputs).unwrap();
+    }
+
+    #[test]
+    fn test_assert_eq_2() {
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let v = system.new_variable();
+        let w = system.new_variable();
+        let z = system.mul(&v, &w);
+        let output = system.new_variable();
+        system.assert_eq(&z, &output);
+
+        let mut inputs = HashMap::from([
+            (v, FieldElement::from(2)),
+            (w, FieldElement::from(2)),
+            (output, FieldElement::from(1)),
+        ]);
+
+        system.solve(&mut inputs).unwrap_err();
+    }
+
     // assert out == if(i1^2 + i1 * i2 + 5 != 0, i1, i2)
     #[test]
     fn test_constraint_system() {
