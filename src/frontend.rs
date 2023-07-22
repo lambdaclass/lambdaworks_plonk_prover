@@ -971,12 +971,11 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_pow() {
-        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
-
-        let base = system.new_variable();
-        let exponent = system.new_variable();
+    fn pow<F: IsPrimeField>(
+        system: &mut ConstraintSystem<F>,
+        base: Variable,
+        exponent: Variable,
+    ) -> Variable {
         let exponent_bits = system.new_u32(&exponent);
         let mut result = system.new_constant(FieldElement::one());
 
@@ -988,6 +987,16 @@ mod tests {
             let result_times_base = system.mul(&result, &base);
             result = system.if_else(&exponent_bits[i], &result_times_base, &result);
         }
+        result
+    }
+
+    #[test]
+    fn test_pow() {
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let base = system.new_variable();
+        let exponent = system.new_variable();
+        let result = pow(system, base, exponent);
         let inputs = HashMap::from([
             (base, FieldElement::from(3)),
             (exponent, FieldElement::from(10)),
@@ -998,6 +1007,30 @@ mod tests {
             assignments.get(&result).unwrap(),
             &FieldElement::from(59049)
         );
+    }
+
+    #[test]
+    fn test_fibonacci() {
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let mut x0 = system.new_variable();
+        let x0_initial = x0.clone();
+        let mut x1 = system.new_variable();
+        let x1_initial = x1.clone();
+
+        for _ in 2..10001 {
+            let x2 = system.add(&x1, &x0);
+            (x0, x1) = (x1, x2);
+        }
+
+        let inputs = HashMap::from([
+            (x0_initial, FieldElement::from(0)),
+            (x1_initial, FieldElement::from(1)),
+        ]);
+
+        let expected_output = FieldElement::from(19257);
+        let assignments = system.solve(inputs).unwrap();
+        assert_eq!(assignments.get(&x1).unwrap(), &expected_output);
     }
 
     #[test]
