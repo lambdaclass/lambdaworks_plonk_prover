@@ -42,55 +42,6 @@ pub struct Constraint<F: IsField> {
     pub o: Variable,
 }
 
-impl<F: IsField> Constraint<F> {
-    fn linear_combination(
-        l: &Variable,
-        r: &Variable,
-        o: &Variable,
-        c1: FE<F>,
-        c2: FE<F>,
-        b: FE<F>,
-        hint: Option<Hint<F>>,
-    ) -> Self {
-        Self {
-            constraint_type: ConstraintType {
-                ql: c1,
-                qr: c2,
-                qm: FE::zero(),
-                qo: -FE::one(),
-                qc: b,
-            },
-            l: *l,
-            r: *r,
-            o: *o,
-            hint,
-        }
-    }
-
-    fn linear_function(
-        l: &Variable,
-        r: &Variable,
-        o: &Variable,
-        c: FE<F>,
-        b: FE<F>,
-        hint: Option<Hint<F>>,
-    ) -> Self {
-        Self {
-            constraint_type: ConstraintType {
-                ql: c,
-                qr: FE::zero(),
-                qm: FE::zero(),
-                qo: -FE::one(),
-                qc: b,
-            },
-            l: *l,
-            r: *r,
-            o: *o,
-            hint,
-        }
-    }
-}
-
 #[allow(unused)]
 pub struct ConstraintSystem<F: IsField> {
     num_variables: usize,
@@ -160,9 +111,20 @@ where
         hint: Option<Hint<F>>,
     ) -> Variable {
         let result = self.new_variable();
-        self.add_constraint(Constraint::linear_combination(
-            v1, v2, &result, c1, c2, b, hint,
-        ));
+
+        self.add_constraint(Constraint {
+            constraint_type: ConstraintType {
+                ql: c1,
+                qr: c2,
+                qm: FE::zero(),
+                qo: -FE::one(),
+                qc: b,
+            },
+            l: *v1,
+            r: *v2,
+            o: result,
+            hint,
+        });
         result
     }
 
@@ -175,14 +137,19 @@ where
         hint: Option<Hint<F>>,
     ) -> Variable {
         let result = self.new_variable();
-        self.add_constraint(Constraint::linear_function(
-            v,
-            &self.null_variable(),
-            &result,
-            c,
-            b,
+        self.add_constraint(Constraint {
+            constraint_type: ConstraintType {
+                ql: c,
+                qr: FE::zero(),
+                qm: FE::zero(),
+                qo: -FE::one(),
+                qc: b,
+            },
+            l: *v,
+            r: self.null_variable(),
+            o: result,
             hint,
-        ));
+        });
         result
     }
 
