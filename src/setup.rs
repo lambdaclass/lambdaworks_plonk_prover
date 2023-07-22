@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
 use crate::frontend::{get_permutation, ConstraintSystem, Variable};
-use crate::test_utils::utils::{
-    generate_domain, generate_permutation_coefficients,
-};
+use crate::test_utils::utils::{generate_domain, generate_permutation_coefficients};
 use lambdaworks_crypto::commitments::traits::IsCommitmentScheme;
 use lambdaworks_crypto::fiat_shamir::default_transcript::DefaultTranscript;
 use lambdaworks_crypto::fiat_shamir::transcript::Transcript;
@@ -23,37 +21,18 @@ pub struct Witness<F: IsField> {
 impl<F: IsField> Witness<F> {
     pub fn new(
         system: &ConstraintSystem<F>,
-        inputs: &HashMap<Variable, FieldElement<F>>,
+        values: &HashMap<Variable, FieldElement<F>>,
         length: usize,
     ) -> Self {
-        let mut a = Vec::with_capacity(length);
-        let mut b = Vec::with_capacity(length);
-        let mut c = Vec::with_capacity(length);
+        let (q, _) = system.to_matrices();
+        let abc: Vec<_> = q.iter().map(|v| values[v].clone()).collect();
+        let n = q.len() / 3;
 
-        // Public input header
-        for constraint in system.public_input_header().iter() {
-            a.push(inputs[&constraint.l].clone());
-            b.push(inputs[&constraint.r].clone());
-            c.push(inputs[&constraint.o].clone());
+        Self {
+            a: abc[..n].to_vec(),
+            b: abc[n..2 * n].to_vec(),
+            c: abc[2 * n..].to_vec(),
         }
-
-        // Body
-        for constraint in system.constraints.iter() {
-            a.push(inputs[&constraint.l].clone());
-            b.push(inputs[&constraint.r].clone());
-            c.push(inputs[&constraint.o].clone());
-        }
-
-        // Padding
-        let padding_constraint = system.padding_constraint();
-        let pad_length = length - a.len();
-        for _ in 0..pad_length {
-            a.push(inputs[&padding_constraint.l].clone());
-            b.push(inputs[&padding_constraint.r].clone());
-            c.push(inputs[&padding_constraint.o].clone());
-        }
-
-        Self { a, b, c }
     }
 }
 
@@ -86,52 +65,25 @@ impl<F: IsFFTField> CommonPreprocessedInput<F> {
         system: &ConstraintSystem<F>,
         order_r_minus_1_root_unity: &FieldElement<F>,
     ) -> Self {
-        let header = system.public_input_header();
-        let body = &system.constraints;
-        let total_length = (header.len() + body.len()).next_power_of_two();
-        let pad =
-            vec![system.padding_constraint(); total_length - header.len() - body.len()];
-
-        let mut full_constraints = header;
-        full_constraints.extend_from_slice(body);
-        full_constraints.extend_from_slice(&pad);
-
-        let n = full_constraints.len();
+        let (lro, q) = system.to_matrices();
+        let n = lro.len() / 3;
         let omega = F::get_primitive_root_of_unity(n.trailing_zeros() as u64).unwrap();
         let domain = generate_domain(&omega, n);
 
-        let n_constraints = full_constraints.len();
-        let mut lro = vec![system.null_variable(); n_constraints * 3];
-
-        // Make a single vector with | a_1 .. a_m | b_1 .. b_m | c_1 .. c_m | concatenated.
-        for (index, constraint) in full_constraints.iter().enumerate() {
-            lro[index] = constraint.l;
-            lro[index + n_constraints] = constraint.r;
-            lro[index + n_constraints * 2] = constraint.o;
-        }
+        let m = q.len() / 5;
+        let ql: Vec<_> = q[..m].to_vec();
+        let qr: Vec<_> = q[m..2 * m].to_vec();
+        let qm: Vec<_> = q[2 * m..3 * m].to_vec();
+        let qo: Vec<_> = q[3 * m..4 * m].to_vec();
+        let qc: Vec<_> = q[4 * m..].to_vec();
 
         let permutation = get_permutation(&lro);
         let permuted =
             generate_permutation_coefficients(&omega, n, &permutation, order_r_minus_1_root_unity);
 
-        let s1_lagrange: Vec<FieldElement<F>> = permuted[..n].to_vec();
-        let s2_lagrange: Vec<FieldElement<F>> = permuted[n..2 * n].to_vec();
-        let s3_lagrange: Vec<FieldElement<F>> = permuted[2 * n..].to_vec();
-
-        let mut ql = Vec::new();
-        let mut qr = Vec::new();
-        let mut qm = Vec::new();
-        let mut qo = Vec::new();
-        let mut qc = Vec::new();
-
-        // Add constraints
-        for constraint in full_constraints.iter() {
-            ql.push(constraint.constraint_type.ql.clone());
-            qr.push(constraint.constraint_type.qr.clone());
-            qm.push(constraint.constraint_type.qm.clone());
-            qo.push(constraint.constraint_type.qo.clone());
-            qc.push(constraint.constraint_type.qc.clone());
-        }
+        let s1_lagrange: Vec<_> = permuted[..n].to_vec();
+        let s2_lagrange: Vec<_> = permuted[n..2 * n].to_vec();
+        let s3_lagrange: Vec<_> = permuted[2 * n..].to_vec();
 
         Self {
             domain,

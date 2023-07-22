@@ -1,6 +1,6 @@
 use lambdaworks_math::field::{
     element::FieldElement,
-    traits::{IsField, IsPrimeField},
+    traits::{IsFFTField, IsField, IsPrimeField},
 };
 use std::collections::HashMap;
 
@@ -275,7 +275,7 @@ where
             input: Column::O,
             output: Column::R,
         });
-        // t0 := 2 b_0 + b_1
+        // t1 := 2 b_0 + b_1
         let t_0 = self.linear_combination(
             &bits[0],
             FieldElement::from(2),
@@ -286,7 +286,7 @@ where
         );
         aux_vars.push(t_0);
         for bit in bits.iter().take(32).skip(2) {
-            // t_{i+1} := 2 t_i + b_i
+            // t_i := 2 t_{i-1} + b_i
             let t_i = self.linear_combination(
                 aux_vars.last().unwrap(),
                 FieldElement::from(2),
@@ -573,6 +573,39 @@ where
         }
         public_input_constraints
     }
+
+    pub fn to_matrices(&self) -> (Vec<Variable>, Vec<FieldElement<F>>)
+    {
+        let header = self.public_input_header();
+        let body = &self.constraints;
+        let total_length = (header.len() + body.len()).next_power_of_two();
+        let pad = vec![self.padding_constraint(); total_length - header.len() - body.len()];
+
+        let mut full_constraints = header;
+        full_constraints.extend_from_slice(body);
+        full_constraints.extend_from_slice(&pad);
+
+        let n = full_constraints.len();
+
+        let mut lro = vec![self.null_variable(); n * 3];
+        // Make a single vector with | a_1 .. a_m | b_1 .. b_m | c_1 .. c_m | concatenated.
+        for (index, constraint) in full_constraints.iter().enumerate() {
+            lro[index] = constraint.l;
+            lro[index + n] = constraint.r;
+            lro[index + n * 2] = constraint.o;
+        }
+
+        let mut q = vec![FieldElement::zero(); 5 * n];
+        for (index, constraint) in full_constraints.iter().enumerate() {
+            let ct = &constraint.constraint_type;
+            q[index] = ct.ql.clone();
+            q[index + n] = ct.qr.clone();
+            q[index + 2 * n] = ct.qm.clone();
+            q[index + 3 * n] = ct.qo.clone();
+            q[index + 4 * n] = ct.qc.clone();
+        }
+        (lro, q)
+    }
 }
 
 pub fn get_permutation(lro: &[Variable]) -> Vec<usize> {
@@ -597,9 +630,7 @@ mod tests {
     use crate::{
         prover::Prover,
         setup::{setup, CommonPreprocessedInput, Witness},
-        test_utils::utils::{
-            test_srs, TestRandomFieldGenerator, KZG, ORDER_R_MINUS_1_ROOT_UNITY,
-        },
+        test_utils::utils::{test_srs, TestRandomFieldGenerator, KZG, ORDER_R_MINUS_1_ROOT_UNITY},
         verifier::Verifier,
     };
 
@@ -622,26 +653,29 @@ mod tests {
     0  1  2
     1  0  3
     2  3  4
+    0  0  0 --> padding to next power of two
 
-    LRO        : 0 1 2 1 0 3 2 3 4
-    Permutation: 4 3 6 1 0 7 2 5 8
+    LRO        :  0  1  2  0  1  0  3  0  2  3  4  0
+    Permutation: 11  4  8  0  1  3  9  5  2  6 10  7
 
     */
-    // #[test]
-    // fn test_permutation() {
-    //     let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
-    //
-    //     let v0 = system.new_variable();
-    //     let v1 = system.new_variable();
-    //
-    //     let v2 = system.add(&v0, &v1);
-    //     let v3 = system.add(&v1, &v0);
-    //     system.add(&v2, &v3);
-    //
-    //     let permutation = get_permutation(&system);
-    //     let expected = vec![4, 3, 6, 1, 0, 7, 2, 5, 8];
-    //     assert_eq!(expected, permutation);
-    // }
+    #[test]
+    fn test_permutation() {
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let v0 = system.new_variable();
+        let v1 = system.new_variable();
+
+        let v2 = system.add(&v0, &v1);
+        let v3 = system.add(&v1, &v0);
+        system.add(&v2, &v3);
+
+        let (lro, _) = system.to_matrices();
+
+        let permutation = get_permutation(&lro);
+        let expected = vec![11, 4, 8, 0, 1, 3, 9, 5, 2, 6, 10, 7];
+        assert_eq!(expected, permutation);
+    }
 
     #[test]
     fn test_prove_simple_program_1() {
@@ -854,10 +888,7 @@ mod tests {
         let output = system.new_variable();
         system.assert_eq(&z, &output);
 
-        let inputs = HashMap::from([
-            (v, FieldElement::from(2)),
-            (w, FieldElement::from(2).inv()),
-        ]);
+        let inputs = HashMap::from([(v, FieldElement::from(2)), (w, FieldElement::from(2).inv())]);
 
         let assignments = system.solve(inputs).unwrap();
         assert_eq!(assignments.get(&output).unwrap(), &FieldElement::one());
