@@ -1,5 +1,5 @@
 use lambdaworks_math::field::{
-    element::FieldElement,
+    element::FieldElement as FE,
     traits::{IsField, IsPrimeField},
 };
 use std::collections::HashMap;
@@ -7,11 +7,11 @@ use std::collections::HashMap;
 // a Ql + b Qr + a b Qm + c Qo + Qc = 0
 #[derive(Clone)]
 pub struct ConstraintType<F: IsField> {
-    pub ql: FieldElement<F>,
-    pub qr: FieldElement<F>,
-    pub qm: FieldElement<F>,
-    pub qo: FieldElement<F>,
-    pub qc: FieldElement<F>,
+    pub ql: FE<F>,
+    pub qr: FE<F>,
+    pub qm: FE<F>,
+    pub qo: FE<F>,
+    pub qc: FE<F>,
 }
 
 #[derive(Clone)]
@@ -24,7 +24,7 @@ enum Column {
 #[allow(unused)]
 #[derive(Clone)]
 pub struct Hint<F: IsField> {
-    function: fn(&FieldElement<F>) -> FieldElement<F>,
+    function: fn(&FE<F>) -> FE<F>,
     input: Column,
     output: Column,
 }
@@ -47,17 +47,17 @@ impl<F: IsField> Constraint<F> {
         l: &Variable,
         r: &Variable,
         o: &Variable,
-        c1: FieldElement<F>,
-        c2: FieldElement<F>,
-        b: FieldElement<F>,
+        c1: FE<F>,
+        c2: FE<F>,
+        b: FE<F>,
         hint: Option<Hint<F>>,
     ) -> Self {
         Self {
             constraint_type: ConstraintType {
                 ql: c1,
                 qr: c2,
-                qm: FieldElement::zero(),
-                qo: -FieldElement::one(),
+                qm: FE::zero(),
+                qo: -FE::one(),
                 qc: b,
             },
             l: *l,
@@ -71,16 +71,16 @@ impl<F: IsField> Constraint<F> {
         l: &Variable,
         r: &Variable,
         o: &Variable,
-        c: FieldElement<F>,
-        b: FieldElement<F>,
+        c: FE<F>,
+        b: FE<F>,
         hint: Option<Hint<F>>,
     ) -> Self {
         Self {
             constraint_type: ConstraintType {
                 ql: c,
-                qr: FieldElement::zero(),
-                qm: FieldElement::zero(),
-                qo: -FieldElement::one(),
+                qr: FE::zero(),
+                qm: FE::zero(),
+                qo: -FE::one(),
                 qc: b,
             },
             l: *l,
@@ -127,14 +127,14 @@ where
         new_variable
     }
 
-    fn new_constant(&mut self, value: FieldElement<F>) -> Variable {
+    fn new_constant(&mut self, value: FE<F>) -> Variable {
         let constant = self.new_variable();
         self.add_constraint(Constraint {
             constraint_type: ConstraintType {
-                ql: -FieldElement::one(),
-                qr: FieldElement::zero(),
-                qm: FieldElement::zero(),
-                qo: FieldElement::zero(),
+                ql: -FE::one(),
+                qr: FE::zero(),
+                qm: FE::zero(),
+                qo: FE::zero(),
                 qc: value,
             },
             l: constant,
@@ -153,10 +153,10 @@ where
     fn linear_combination(
         &mut self,
         v1: &Variable,
-        c1: FieldElement<F>,
+        c1: FE<F>,
         v2: &Variable,
-        c2: FieldElement<F>,
-        b: FieldElement<F>,
+        c2: FE<F>,
+        b: FE<F>,
         hint: Option<Hint<F>>,
     ) -> Variable {
         let result = self.new_variable();
@@ -170,8 +170,8 @@ where
     fn linear_function(
         &mut self,
         v: &Variable,
-        c: FieldElement<F>,
-        b: FieldElement<F>,
+        c: FE<F>,
+        b: FE<F>,
         hint: Option<Hint<F>>,
     ) -> Variable {
         let result = self.new_variable();
@@ -187,29 +187,22 @@ where
     }
 
     fn add(&mut self, v1: &Variable, v2: &Variable) -> Variable {
-        self.linear_combination(
-            v1,
-            FieldElement::one(),
-            v2,
-            FieldElement::one(),
-            FieldElement::zero(),
-            None,
-        )
+        self.linear_combination(v1, FE::one(), v2, FE::one(), FE::zero(), None)
     }
 
-    fn add_constant(&mut self, v: &Variable, constant: FieldElement<F>) -> Variable {
-        self.linear_function(v, FieldElement::one(), constant, None)
+    fn add_constant(&mut self, v: &Variable, constant: FE<F>) -> Variable {
+        self.linear_function(v, FE::one(), constant, None)
     }
 
     fn mul(&mut self, v1: &Variable, v2: &Variable) -> Variable {
         let result = self.new_variable();
         self.add_constraint(Constraint {
             constraint_type: ConstraintType {
-                ql: FieldElement::zero(),
-                qr: FieldElement::zero(),
-                qm: FieldElement::one(),
-                qo: -FieldElement::one(),
-                qc: FieldElement::zero(),
+                ql: FE::zero(),
+                qr: FE::zero(),
+                qm: FE::one(),
+                qo: -FE::one(),
+                qc: FE::zero(),
             },
             l: *v1,
             r: *v2,
@@ -224,11 +217,11 @@ where
         let result = self.new_variable();
         self.add_constraint(Constraint {
             constraint_type: ConstraintType {
-                ql: FieldElement::zero(),
-                qr: FieldElement::zero(),
-                qm: FieldElement::one(),
-                qo: -FieldElement::one(),
-                qc: FieldElement::zero(),
+                ql: FE::zero(),
+                qr: FE::zero(),
+                qm: FE::one(),
+                qo: -FE::one(),
+                qc: FE::zero(),
             },
             l: result,
             r: *v2,
@@ -242,11 +235,11 @@ where
         let boolean = self.new_variable();
         self.add_constraint(Constraint {
             constraint_type: ConstraintType {
-                ql: -FieldElement::one(),
-                qr: FieldElement::zero(),
-                qm: FieldElement::one(),
-                qo: FieldElement::zero(),
-                qc: FieldElement::zero(),
+                ql: -FE::one(),
+                qr: FE::zero(),
+                qm: FE::one(),
+                qo: FE::zero(),
+                qc: FE::zero(),
             },
             l: boolean,
             r: boolean,
@@ -262,11 +255,11 @@ where
     {
         let bits: Vec<_> = (0..32).map(|_| self.new_boolean()).collect();
         let mut aux_vars: Vec<Variable> = Vec::new();
-        let hint_function = |v: &FieldElement<F>| {
+        let hint_function = |v: &FE<F>| {
             if v.representative() & 1.into() == 1.into() {
-                FieldElement::one()
+                FE::one()
             } else {
-                FieldElement::zero()
+                FE::zero()
             }
         };
 
@@ -278,10 +271,10 @@ where
         // t1 := 2 b_0 + b_1
         let t_0 = self.linear_combination(
             &bits[0],
-            FieldElement::from(2),
+            FE::from(2),
             &bits[1],
-            FieldElement::one(),
-            FieldElement::zero(),
+            FE::one(),
+            FE::zero(),
             hint.clone(),
         );
         aux_vars.push(t_0);
@@ -289,10 +282,10 @@ where
             // t_i := 2 t_{i-1} + b_i
             let t_i = self.linear_combination(
                 aux_vars.last().unwrap(),
-                FieldElement::from(2),
+                FE::from(2),
                 bit,
-                FieldElement::one(),
-                FieldElement::zero(),
+                FE::one(),
+                FE::zero(),
                 hint.clone(),
             );
             aux_vars.push(t_i);
@@ -305,11 +298,11 @@ where
         let result = self.new_variable();
         self.add_constraint(Constraint {
             constraint_type: ConstraintType {
-                ql: FieldElement::one(),
-                qr: FieldElement::one(),
-                qm: FieldElement::zero(),
-                qo: FieldElement::zero(),
-                qc: -FieldElement::one(),
+                ql: FE::one(),
+                qr: FE::one(),
+                qm: FE::zero(),
+                qo: FE::zero(),
+                qc: -FE::one(),
             },
             l: *v,
             r: result,
@@ -323,11 +316,11 @@ where
         let is_zero = self.new_variable();
         let v_inverse = self.new_variable();
         let hint = Some(Hint {
-            function: |v: &FieldElement<F>| {
-                if *v == FieldElement::zero() {
-                    FieldElement::one()
+            function: |v: &FE<F>| {
+                if *v == FE::zero() {
+                    FE::one()
                 } else {
-                    FieldElement::zero()
+                    FE::zero()
                 }
             },
             input: Column::L,
@@ -336,11 +329,11 @@ where
         // v * z == 0
         self.add_constraint(Constraint {
             constraint_type: ConstraintType {
-                ql: FieldElement::zero(),
-                qr: FieldElement::zero(),
-                qm: FieldElement::one(),
-                qo: FieldElement::zero(),
-                qc: FieldElement::zero(),
+                ql: FE::zero(),
+                qr: FE::zero(),
+                qm: FE::one(),
+                qo: FE::zero(),
+                qc: FE::zero(),
             },
             l: *v,
             r: is_zero,
@@ -350,19 +343,19 @@ where
         // v * w + z == 1
         self.add_constraint(Constraint {
             constraint_type: ConstraintType {
-                ql: FieldElement::zero(),
-                qr: FieldElement::zero(),
-                qm: FieldElement::one(),
-                qo: FieldElement::one(),
-                qc: -FieldElement::one(),
+                ql: FE::zero(),
+                qr: FE::zero(),
+                qm: FE::one(),
+                qo: FE::one(),
+                qc: -FE::one(),
             },
             l: *v,
             r: v_inverse, // w
             o: is_zero,   // z
             hint: Some(Hint {
-                function: |v: &FieldElement<F>| {
-                    if *v == FieldElement::zero() {
-                        FieldElement::zero()
+                function: |v: &FE<F>| {
+                    if *v == FE::zero() {
+                        FE::zero()
                     } else {
                         v.inv()
                     }
@@ -377,11 +370,11 @@ where
     fn assert_eq(&mut self, v1: &Variable, v2: &Variable) {
         self.add_constraint(Constraint {
             constraint_type: ConstraintType {
-                ql: FieldElement::one(),
-                qr: -FieldElement::one(),
-                qm: FieldElement::zero(),
-                qo: FieldElement::zero(),
-                qc: FieldElement::zero(),
+                ql: FE::one(),
+                qr: -FE::one(),
+                qm: FE::zero(),
+                qo: FE::zero(),
+                qc: FE::zero(),
             },
             l: *v1,
             r: *v2,
@@ -403,7 +396,7 @@ where
     }
 
     pub fn padding_constraint(&self) -> Constraint<F> {
-        let zero = FieldElement::zero();
+        let zero = FE::zero();
         Constraint {
             constraint_type: ConstraintType {
                 ql: zero.clone(),
@@ -421,8 +414,8 @@ where
 
     pub fn solve(
         &self,
-        mut assignments: HashMap<Variable, FieldElement<F>>,
-    ) -> Result<(HashMap<Variable, FieldElement<F>>), ()> {
+        mut assignments: HashMap<Variable, FE<F>>,
+    ) -> Result<(HashMap<Variable, FE<F>>), ()> {
         let mut number_solved = 0;
         let mut checked_constraints = vec![false; self.constraints.len()];
         loop {
@@ -495,7 +488,7 @@ where
                     let a = assignments.get(&constraint.l).unwrap();
                     let b = assignments.get(&constraint.r).unwrap();
                     let mut c = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + &ct.qc;
-                    if ct.qo == FieldElement::zero() {
+                    if ct.qo == FE::zero() {
                         continue;
                     }
                     c = -c * ct.qo.inv();
@@ -505,7 +498,7 @@ where
                     let c = assignments.get(&constraint.o).unwrap();
                     let mut b = a * &ct.ql + c * &ct.qo + &ct.qc;
                     let denominator = &ct.qr + a * &ct.qm;
-                    if denominator == FieldElement::zero() {
+                    if denominator == FE::zero() {
                         continue;
                     }
                     b = -b * denominator.inv();
@@ -515,7 +508,7 @@ where
                     let c = assignments.get(&constraint.o).unwrap();
                     let mut a = b * &ct.qr + c * &ct.qo + &ct.qc;
                     let denominator = &ct.ql + b * &ct.qm;
-                    if denominator == FieldElement::zero() {
+                    if denominator == FE::zero() {
                         continue;
                     }
                     a = -a * denominator.inv();
@@ -540,7 +533,7 @@ where
                     (Some(a), Some(b), Some(c)) => {
                         let ct = &constraint.constraint_type;
                         let result = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + c * &ct.qo + &ct.qc;
-                        if result != FieldElement::zero() {
+                        if result != FE::zero() {
                             return Err(());
                         }
                     }
@@ -552,8 +545,8 @@ where
     }
 
     fn public_input_header(&self) -> Vec<Constraint<F>> {
-        let zero = FieldElement::zero();
-        let minus_one = -FieldElement::one();
+        let zero = FE::zero();
+        let minus_one = -FE::one();
         let mut public_input_constraints = Vec::new();
         for public_input in self.public_input_variables.iter() {
             let public_input_constraint = Constraint {
@@ -574,7 +567,7 @@ where
         public_input_constraints
     }
 
-    pub fn to_matrices(&self) -> (Vec<Variable>, Vec<FieldElement<F>>) {
+    pub fn to_matrices(&self) -> (Vec<Variable>, Vec<FE<F>>) {
         let header = self.public_input_header();
         let body = &self.constraints;
         let total_length = (header.len() + body.len()).next_power_of_two();
@@ -594,7 +587,7 @@ where
             lro[index + n * 2] = constraint.o;
         }
 
-        let mut q = vec![FieldElement::zero(); 5 * n];
+        let mut q = vec![FE::zero(); 5 * n];
         for (index, constraint) in full_constraints.iter().enumerate() {
             let ct = &constraint.constraint_type;
             q[index] = ct.ql.clone();
@@ -606,10 +599,7 @@ where
         (lro, q)
     }
 
-    fn public_input_values(
-        &self,
-        values: &HashMap<Variable, FieldElement<F>>,
-    ) -> Vec<FieldElement<F>> {
+    fn public_input_values(&self, values: &HashMap<Variable, FE<F>>) -> Vec<FE<F>> {
         let mut public_inputs = Vec::new();
         for key in &self.public_input_variables {
             if let Some(value) = values.get(key) {
@@ -649,7 +639,7 @@ mod tests {
     use super::*;
     use lambdaworks_math::{
         elliptic_curve::short_weierstrass::curves::bls12_381::default_types::FrField,
-        field::{element::FieldElement, fields::u64_prime_field::U64PrimeField},
+        field::{element::FieldElement as FE, fields::u64_prime_field::U64PrimeField},
     };
 
     /*
@@ -712,7 +702,7 @@ mod tests {
 
         // Prover:
         // 1. Generate public inputs and witness
-        let inputs = HashMap::from([(x, FieldElement::from(4)), (e, FieldElement::from(3))]);
+        let inputs = HashMap::from([(x, FE::from(4)), (e, FE::from(3))]);
         let assignments = system.solve(inputs).unwrap();
         let public_inputs = system.public_input_values(&assignments);
         let witness = Witness::new(assignments, &system);
@@ -742,14 +732,14 @@ mod tests {
         let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
 
         let v1 = system.new_variable();
-        let c1 = FieldElement::from(15);
+        let c1 = FE::from(15);
         let v2 = system.new_variable();
-        let c2 = -FieldElement::from(7);
-        let b = FieldElement::from(99);
+        let c2 = -FE::from(7);
+        let b = FE::from(99);
         let result = system.linear_combination(&v1, c1, &v2, c2, b, None);
 
-        let x = FieldElement::from(17);
-        let y = FieldElement::from(29);
+        let x = FE::from(17);
+        let y = FE::from(29);
 
         let inputs = HashMap::from([(v1, x), (v2, y)]);
 
@@ -762,11 +752,11 @@ mod tests {
         let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
 
         let v = system.new_variable();
-        let c = FieldElement::from(8);
-        let b = FieldElement::from(109);
+        let c = FE::from(8);
+        let b = FE::from(109);
         let result = system.linear_function(&v, c, b, None);
 
-        let x = FieldElement::from(17);
+        let x = FE::from(17);
 
         let inputs = HashMap::from([(v, x)]);
 
@@ -782,8 +772,8 @@ mod tests {
         let input2 = system.new_variable();
         let result = system.add(&input1, &input2);
 
-        let a = FieldElement::from(3);
-        let b = FieldElement::from(10);
+        let a = FE::from(3);
+        let b = FE::from(10);
 
         let inputs = HashMap::from([(input1, a), (input2, b)]);
 
@@ -799,8 +789,8 @@ mod tests {
         let input2 = system.new_variable();
         let result = system.mul(&input1, &input2);
 
-        let a = FieldElement::from(3);
-        let b = FieldElement::from(11);
+        let a = FE::from(3);
+        let b = FE::from(11);
 
         let inputs = HashMap::from([(input1, a), (input2, b)]);
 
@@ -816,8 +806,8 @@ mod tests {
         let input2 = system.new_variable();
         let result = system.div(&input1, &input2);
 
-        let a = FieldElement::from(3);
-        let b = FieldElement::from(11);
+        let a = FE::from(3);
+        let b = FE::from(11);
 
         let inputs = HashMap::from([(input1, a), (input2, b)]);
 
@@ -830,12 +820,12 @@ mod tests {
         let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
 
         let input1 = system.new_variable();
-        let b = FieldElement::from(11);
+        let b = FE::from(11);
         let result = system.add_constant(&input1, b.clone());
 
-        let a = FieldElement::from(3);
+        let a = FE::from(3);
 
-        let inputs = HashMap::from([(input1, FieldElement::from(a))]);
+        let inputs = HashMap::from([(input1, FE::from(a))]);
 
         let assignments = system.solve(inputs).unwrap();
         assert_eq!(assignments.get(&result).unwrap(), &(a + b));
@@ -849,11 +839,11 @@ mod tests {
         let result1 = system.not(&boolean);
         let result2 = system.not(&result1);
 
-        let inputs = HashMap::from([(boolean, FieldElement::one())]);
+        let inputs = HashMap::from([(boolean, FE::one())]);
 
         let assignments = system.solve(inputs).unwrap();
-        assert_eq!(assignments.get(&result1).unwrap(), &FieldElement::zero());
-        assert_eq!(assignments.get(&result2).unwrap(), &FieldElement::one());
+        assert_eq!(assignments.get(&result1).unwrap(), &FE::zero());
+        assert_eq!(assignments.get(&result2).unwrap(), &FE::one());
     }
 
     #[test]
@@ -865,17 +855,14 @@ mod tests {
         let (v_is_zero, v_inverse) = system.inv(&v);
         let (w_is_zero, w_inverse) = system.inv(&w);
 
-        let inputs = HashMap::from([(v, FieldElement::from(2)), (w, FieldElement::from(0))]);
+        let inputs = HashMap::from([(v, FE::from(2)), (w, FE::from(0))]);
 
         let assignments = system.solve(inputs).unwrap();
-        assert_eq!(
-            assignments.get(&v_inverse).unwrap(),
-            &FieldElement::from(2).inv()
-        );
-        assert_eq!(assignments.get(&v_is_zero).unwrap(), &FieldElement::zero());
+        assert_eq!(assignments.get(&v_inverse).unwrap(), &FE::from(2).inv());
+        assert_eq!(assignments.get(&v_is_zero).unwrap(), &FE::zero());
 
-        assert_eq!(assignments.get(&w_inverse).unwrap(), &FieldElement::from(0));
-        assert_eq!(assignments.get(&w_is_zero).unwrap(), &FieldElement::one());
+        assert_eq!(assignments.get(&w_inverse).unwrap(), &FE::from(0));
+        assert_eq!(assignments.get(&w_is_zero).unwrap(), &FE::one());
     }
 
     #[test]
@@ -888,10 +875,10 @@ mod tests {
         let output = system.new_variable();
         system.assert_eq(&z, &output);
 
-        let inputs = HashMap::from([(v, FieldElement::from(2)), (w, FieldElement::from(2).inv())]);
+        let inputs = HashMap::from([(v, FE::from(2)), (w, FE::from(2).inv())]);
 
         let assignments = system.solve(inputs).unwrap();
-        assert_eq!(assignments.get(&output).unwrap(), &FieldElement::one());
+        assert_eq!(assignments.get(&output).unwrap(), &FE::one());
     }
 
     #[test]
@@ -904,11 +891,7 @@ mod tests {
         let output = system.new_variable();
         system.assert_eq(&z, &output);
 
-        let inputs = HashMap::from([
-            (v, FieldElement::from(2)),
-            (w, FieldElement::from(2)),
-            (output, FieldElement::from(1)),
-        ]);
+        let inputs = HashMap::from([(v, FE::from(2)), (w, FE::from(2)), (output, FE::from(1))]);
 
         let _assignments = system.solve(inputs).unwrap_err();
     }
@@ -920,10 +903,10 @@ mod tests {
         let v = system.new_variable();
         let v2 = system.mul(&v, &v);
         let v4 = system.mul(&v2, &v2);
-        let w = system.add_constant(&v4, -FieldElement::one());
+        let w = system.add_constant(&v4, -FE::one());
         let output = system.if_nonzero_else(&w, &v, &v2);
 
-        let inputs = HashMap::from([(v, FieldElement::from(256))]);
+        let inputs = HashMap::from([(v, FE::from(256))]);
 
         let assignments = system.solve(inputs).unwrap();
         assert_eq!(
@@ -939,10 +922,10 @@ mod tests {
         let v = system.new_variable();
         let v2 = system.mul(&v, &v);
         let v4 = system.mul(&v2, &v2);
-        let w = system.add_constant(&v4, -FieldElement::one());
+        let w = system.add_constant(&v4, -FE::one());
         let output = system.if_nonzero_else(&w, &v, &v2);
 
-        let inputs = HashMap::from([(v, FieldElement::from(255))]);
+        let inputs = HashMap::from([(v, FE::from(255))]);
 
         let assignments = system.solve(inputs).unwrap();
         assert_eq!(
@@ -959,7 +942,7 @@ mod tests {
         let u32_var = system.new_u32(&input);
 
         let a = 59049;
-        let inputs = HashMap::from([(input, FieldElement::from(a))]);
+        let inputs = HashMap::from([(input, FE::from(a))]);
 
         let assignments = system.solve(inputs).unwrap();
 
@@ -977,7 +960,7 @@ mod tests {
         exponent: Variable,
     ) -> Variable {
         let exponent_bits = system.new_u32(&exponent);
-        let mut result = system.new_constant(FieldElement::one());
+        let mut result = system.new_constant(FE::one());
 
         assert_eq!(exponent_bits.len(), 32);
         for i in 0..32 {
@@ -997,16 +980,10 @@ mod tests {
         let base = system.new_variable();
         let exponent = system.new_variable();
         let result = pow(system, base, exponent);
-        let inputs = HashMap::from([
-            (base, FieldElement::from(3)),
-            (exponent, FieldElement::from(10)),
-        ]);
+        let inputs = HashMap::from([(base, FE::from(3)), (exponent, FE::from(10))]);
 
         let assignments = system.solve(inputs).unwrap();
-        assert_eq!(
-            assignments.get(&result).unwrap(),
-            &FieldElement::from(59049)
-        );
+        assert_eq!(assignments.get(&result).unwrap(), &FE::from(59049));
     }
 
     #[test]
@@ -1023,14 +1000,34 @@ mod tests {
             (x0, x1) = (x1, x2);
         }
 
-        let inputs = HashMap::from([
-            (x0_initial, FieldElement::from(0)),
-            (x1_initial, FieldElement::from(1)),
-        ]);
+        let inputs = HashMap::from([(x0_initial, FE::from(0)), (x1_initial, FE::from(1))]);
 
-        let expected_output = FieldElement::from(19257);
+        let expected_output = FE::from(19257);
         let assignments = system.solve(inputs).unwrap();
         assert_eq!(assignments.get(&x1).unwrap(), &expected_output);
+    }
+
+    fn mimc<F: IsField>(
+        system: &mut ConstraintSystem<F>,
+        coefficients: &[FE<F>],
+        data: &[Variable],
+    ) -> Variable {
+        let mut h = system.new_constant(FE::zero());
+
+        for stream in data.iter() {
+            let mut x = *stream;
+            for c in coefficients.iter() {
+                // x = (x + h + c) ** 5
+                x = system.linear_combination(&x, FE::one(), &h, FE::one(), c.clone(), None);
+                let x_pow_2 = system.mul(&x, &x);
+                let x_pow_4 = system.mul(&x_pow_2, &x_pow_2);
+                x = system.mul(&x_pow_4, &x);
+            }
+            // h = x + 2h + stream
+            h = system.linear_combination(&x, FE::one(), &h, FE::from(2), FE::zero(), None);
+            h = system.add(&h, &stream);
+        }
+        h
     }
 
     #[test]
@@ -1148,59 +1145,24 @@ mod tests {
             "3db4cc8fd2f2f8e1478ad41b7c1e5c5ef19301bb87f44b49b378fe3e7e3a2264",
             "3261a8cb17034b0c32bc98cc77513ad895233f70e86d8ff6df57485ad194afc6",
         ];
-
         let coefficients: Vec<_> = coefficients
             .iter()
-            .map(|hex_str| FieldElement::from_hex(hex_str).unwrap())
+            .map(|hex_str| FE::from_hex(hex_str).unwrap())
             .collect();
 
         let system = &mut ConstraintSystem::<FrField>::new();
-        let mut data = vec![system.new_variable()];
-
-        let mut h = system.new_constant(FieldElement::zero());
-
-        for stream in data.iter_mut() {
-            let mut x = *stream;
-            for c in coefficients.iter() {
-                // x = (x + h + c) ** 5
-                x = system.linear_combination(
-                    &x,
-                    FieldElement::one(),
-                    &h,
-                    FieldElement::one(),
-                    c.clone(),
-                    None,
-                );
-                let x_pow_2 = system.mul(&x, &x);
-                let x_pow_4 = system.mul(&x_pow_2, &x_pow_2);
-                x = system.mul(&x_pow_4, &x);
-            }
-            // h = x + 2h + stream
-            h = system.linear_combination(
-                &x,
-                FieldElement::one(),
-                &h,
-                FieldElement::from(2),
-                FieldElement::zero(),
-                None,
-            );
-            h = system.add(&h, &stream);
-        }
-        let output = system.new_variable();
-        system.assert_eq(&h, &output);
+        let data = vec![system.new_variable()];
+        let output = mimc(system, &coefficients, &data);
 
         let inputs = HashMap::from([(
             data[0],
-            FieldElement::from_hex(
-                "23a950068dd3d1e21cee48e7919be7ae32cdef70311fc486336ea9d4b5042535",
-            )
-            .unwrap(),
+            FE::from_hex("23a950068dd3d1e21cee48e7919be7ae32cdef70311fc486336ea9d4b5042535")
+                .unwrap(),
         )]);
 
-        let expected_output_value = FieldElement::from_hex(
-            "136ff6a4e5fc9a2103cc54252d93c3be07f781dc4405acd9447bee65cfdc7c14",
-        )
-        .unwrap();
+        let expected_output_value =
+            FE::from_hex("136ff6a4e5fc9a2103cc54252d93c3be07f781dc4405acd9447bee65cfdc7c14")
+                .unwrap();
 
         let assignments = system.solve(inputs).unwrap();
         assert_eq!(assignments.get(&output).unwrap(), &expected_output_value);
