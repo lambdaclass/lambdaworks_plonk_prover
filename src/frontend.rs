@@ -1121,17 +1121,16 @@ mod tests {
         let data = vec![system.new_variable()];
         let output = mimc(system, &coefficients, &data);
 
-        let inputs = HashMap::from([(
-            data[0],
+        let input_value =
             FE::from_hex("23a950068dd3d1e21cee48e7919be7ae32cdef70311fc486336ea9d4b5042535")
-                .unwrap(),
-        )]);
-
+                .unwrap();
         let expected_output_value =
             FE::from_hex("136ff6a4e5fc9a2103cc54252d93c3be07f781dc4405acd9447bee65cfdc7c14")
                 .unwrap();
 
+        let inputs = HashMap::from([(data[0], input_value)]);
         let assignments = system.solve(inputs).unwrap();
+
         assert_eq!(assignments.get(&output).unwrap(), &expected_output_value);
     }
 }
