@@ -1,6 +1,6 @@
 use lambdaworks_math::field::{
     element::FieldElement,
-    traits::{IsFFTField, IsField, IsPrimeField},
+    traits::{IsField, IsPrimeField},
 };
 use std::collections::HashMap;
 
@@ -551,7 +551,7 @@ where
         Ok(assignments)
     }
 
-    pub fn public_input_header(&self) -> Vec<Constraint<F>> {
+    fn public_input_header(&self) -> Vec<Constraint<F>> {
         let zero = FieldElement::zero();
         let minus_one = -FieldElement::one();
         let mut public_input_constraints = Vec::new();
@@ -574,8 +574,7 @@ where
         public_input_constraints
     }
 
-    pub fn to_matrices(&self) -> (Vec<Variable>, Vec<FieldElement<F>>)
-    {
+    pub fn to_matrices(&self) -> (Vec<Variable>, Vec<FieldElement<F>>) {
         let header = self.public_input_header();
         let body = &self.constraints;
         let total_length = (header.len() + body.len()).next_power_of_two();
@@ -605,6 +604,19 @@ where
             q[index + 4 * n] = ct.qc.clone();
         }
         (lro, q)
+    }
+
+    fn public_input_values(
+        &self,
+        values: &HashMap<Variable, FieldElement<F>>,
+    ) -> Vec<FieldElement<F>> {
+        let mut public_inputs = Vec::new();
+        for key in &self.public_input_variables {
+            if let Some(value) = values.get(key) {
+                public_inputs.push(value.clone());
+            }
+        }
+        public_inputs
     }
 }
 
@@ -679,6 +691,7 @@ mod tests {
 
     #[test]
     fn test_prove_simple_program_1() {
+        // Program
         let system = &mut ConstraintSystem::<FrField>::new();
 
         let e = system.new_variable();
@@ -699,23 +712,10 @@ mod tests {
 
         // Prover:
         // 1. Generate public inputs and witness
-        let inputs = HashMap::from([
-            (x, FieldElement::from(4)),
-            (y, FieldElement::from(12)),
-            (e, FieldElement::from(3)),
-        ]);
-
+        let inputs = HashMap::from([(x, FieldElement::from(4)), (e, FieldElement::from(3))]);
         let assignments = system.solve(inputs).unwrap();
-        let public_inputs = {
-            let mut public_inputs = Vec::new();
-            for key in &system.public_input_variables {
-                if let Some(value) = assignments.get(&key) {
-                    public_inputs.push(value.clone());
-                }
-            }
-            public_inputs
-        };
-        let witness = Witness::new(&system, &assignments, common_preprocessed_input.n);
+        let public_inputs = system.public_input_values(&assignments);
+        let witness = Witness::new(assignments, &system);
 
         // 2. Generate proof
         let random_generator = TestRandomFieldGenerator {};
