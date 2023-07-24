@@ -2,8 +2,147 @@ use std::collections::HashMap;
 
 use lambdaworks_math::field::{element::FieldElement as FE, traits::IsField};
 
-use super::{Column, ConstraintSystem, Variable};
+use super::{Column, Constraint, ConstraintSystem, Variable};
 
+fn solve_constraint_hint<F: IsField>(
+    mut assignments: HashMap<Variable, FE<F>>,
+    constraint: &Constraint<F>,
+    mut number_solved: usize,
+) -> (HashMap<Variable, FE<F>>, usize) {
+    let a = assignments.get(&constraint.l);
+    let b = assignments.get(&constraint.r);
+    let c = assignments.get(&constraint.o);
+
+    if let Some(hint) = &constraint.hint {
+        let function = hint.function;
+        match (&hint.input, &hint.output, a, b, c) {
+            (Column::L, Column::R, Some(a), None, _) => {
+                assignments.insert(constraint.r, function(a));
+                number_solved += 1;
+            }
+            (Column::L, Column::O, Some(a), _, None) => {
+                assignments.insert(constraint.o, function(a));
+                number_solved += 1;
+            }
+            (Column::R, Column::L, None, Some(b), _) => {
+                assignments.insert(constraint.l, function(b));
+                number_solved += 1;
+            }
+            (Column::R, Column::O, _, Some(b), None) => {
+                assignments.insert(constraint.o, function(b));
+                number_solved += 1;
+            }
+            (Column::O, Column::L, None, _, Some(c)) => {
+                assignments.insert(constraint.l, function(c));
+                number_solved += 1;
+            }
+            (Column::O, Column::R, _, None, Some(c)) => {
+                assignments.insert(constraint.r, function(c));
+                number_solved += 1;
+            }
+            _ => {}
+        }
+    }
+    (assignments, number_solved)
+}
+
+fn solve_constraint<F: IsField>(
+    mut assignments: HashMap<Variable, FE<F>>,
+    constraint: &Constraint<F>,
+    number_solved: usize,
+) -> (HashMap<Variable, FE<F>>, usize) {
+    let ct = &constraint.constraint_type;
+    let a = assignments.get(&constraint.l);
+    let b = assignments.get(&constraint.r);
+    let c = assignments.get(&constraint.o);
+    let zero = FE::zero();
+
+    match (
+        (a, b, c),
+        (ct.ql == zero, ct.qr == zero, ct.qm == zero, ct.qo == zero),
+    ) {
+        ((Some(a), Some(b), Some(c)), _) => {
+            return (assignments, number_solved);
+        }
+        ((Some(a), Some(b), None), _) => {
+            if ct.qo != FE::zero() {
+                let mut c = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + &ct.qc;
+                c = -c * ct.qo.inv();
+                assignments.insert(constraint.o, c);
+            } else {
+                return (assignments, number_solved);
+            }
+        }
+        ((Some(a), None, Some(c)), _) => {
+            let denominator = &ct.qr + a * &ct.qm;
+            if denominator != FE::zero() {
+                let mut b = a * &ct.ql + c * &ct.qo + &ct.qc;
+                b = -b * denominator.inv();
+                assignments.insert(constraint.r, b);
+            } else {
+                return (assignments, number_solved);
+            }
+        }
+        ((None, Some(b), Some(c)), _) => {
+            let denominator = &ct.ql + b * &ct.qm;
+            if denominator != FE::zero() {
+                let mut a = b * &ct.qr + c * &ct.qo + &ct.qc;
+                a = -a * denominator.inv();
+                assignments.insert(constraint.l, a);
+            } else {
+                return (assignments, number_solved);
+            }
+        }
+        ((Some(a), None, None), _) => {
+            let b_coefficient = &ct.qr + a * &ct.qm;
+            if b_coefficient == FE::zero() && ct.qo != FE::zero() {
+                let c = -(a * &ct.ql + &ct.qc) * ct.qo.inv();
+                assignments.insert(constraint.o, c);
+            } else if b_coefficient != FE::zero() && ct.qo == FE::zero() {
+                let b = -(a * &ct.ql + &ct.qc) * b_coefficient.inv();
+                assignments.insert(constraint.r, b);
+            } else {
+                return (assignments, number_solved);
+            }
+        }
+        ((None, Some(b), None), _) => {
+            let a_coefficient = &ct.ql + b * &ct.qm;
+            if a_coefficient == FE::zero() && ct.qo != FE::zero() {
+                let c = -(b * &ct.qr + &ct.qc) * ct.qo.inv();
+                assignments.insert(constraint.o, c);
+            } else if a_coefficient != FE::zero() && ct.qo == FE::zero() {
+                let a = -(b * &ct.qr + &ct.qc) * a_coefficient.inv();
+                assignments.insert(constraint.l, a);
+            } else {
+                return (assignments, number_solved);
+            }
+        }
+        ((None, None, Some(c)), (false, true, true, _)) => {
+            let a = -(c * &ct.qo + &ct.qc) * ct.ql.inv();
+            assignments.insert(constraint.l, a);
+        }
+        ((None, None, Some(c)), (true, false, true, _)) => {
+            let b = -(c * &ct.qo + &ct.qc) * ct.qr.inv();
+            assignments.insert(constraint.r, b);
+        }
+        ((None, None, None), (true, true, true, false)) => {
+            let c = -&ct.qc * ct.qo.inv();
+            assignments.insert(constraint.o, c);
+        }
+        ((None, None, None), (true, false, true, true)) => {
+            let b = -&ct.qc * ct.qr.inv();
+            assignments.insert(constraint.r, b);
+        }
+        ((None, None, None), (false, true, true, true)) => {
+            let a = -&ct.qc * ct.ql.inv();
+            assignments.insert(constraint.l, a);
+        }
+        _ => {
+            return (assignments, number_solved);
+        }
+    }
+    (assignments, number_solved + 1)
+}
 /// Finds a solution to the system extending the `assignments` map.
 /// It returns an error in case there is no such solution.
 #[allow(unused)]
@@ -16,159 +155,33 @@ where
         mut assignments: HashMap<Variable, FE<F>>,
     ) -> Result<(HashMap<Variable, FE<F>>), ()> {
         let mut number_solved = 0;
-        let mut checked_constraints = vec![false; self.constraints.len()];
         loop {
             let old_solved = number_solved;
             for (i, constraint) in self.constraints.iter().enumerate() {
-                let ct = &constraint.constraint_type;
-                let a = assignments.get(&constraint.l);
-                let b = assignments.get(&constraint.r);
-                let c = assignments.get(&constraint.o);
-
-                if let Some(hint) = &constraint.hint {
-                    let function = hint.function;
-                    match (&hint.input, &hint.output, a, b, c) {
-                        (Column::L, Column::R, Some(a), None, _) => {
-                            assignments.insert(constraint.r, function(a));
-                            number_solved += 1;
-                        }
-                        (Column::L, Column::O, Some(a), _, None) => {
-                            assignments.insert(constraint.o, function(a));
-                            number_solved += 1;
-                        }
-                        (Column::R, Column::L, None, Some(b), _) => {
-                            assignments.insert(constraint.l, function(b));
-                            number_solved += 1;
-                        }
-                        (Column::R, Column::O, _, Some(b), None) => {
-                            assignments.insert(constraint.o, function(b));
-                            number_solved += 1;
-                        }
-                        (Column::O, Column::L, None, _, Some(c)) => {
-                            assignments.insert(constraint.l, function(c));
-                            number_solved += 1;
-                        }
-                        (Column::O, Column::R, _, None, Some(c)) => {
-                            assignments.insert(constraint.r, function(c));
-                            number_solved += 1;
-                        }
-                        _ => {}
-                    }
-                }
-
-                let a = assignments.get(&constraint.l);
-                let b = assignments.get(&constraint.r);
-                let c = assignments.get(&constraint.o);
-                let zero = FE::zero();
-
-                match (
-                    (a, b, c),
-                    (ct.ql == zero, ct.qr == zero, ct.qm == zero, ct.qo == zero),
-                ) {
-                    ((Some(a), Some(b), Some(c)), _) => {
-                        continue;
-                    }
-                    ((Some(a), Some(b), None), _) => {
-                        if ct.qo != FE::zero() {
-                            let mut c = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + &ct.qc;
-                            c = -c * ct.qo.inv();
-                            assignments.insert(constraint.o, c);
-                        } else {
-                            continue;
-                        }
-                    }
-                    ((Some(a), None, Some(c)), _) => {
-                        let denominator = &ct.qr + a * &ct.qm;
-                        if denominator != FE::zero() {
-                            let mut b = a * &ct.ql + c * &ct.qo + &ct.qc;
-                            b = -b * denominator.inv();
-                            assignments.insert(constraint.r, b);
-                        } else {
-                            continue;
-                        }
-                    }
-                    ((None, Some(b), Some(c)), _) => {
-                        let denominator = &ct.ql + b * &ct.qm;
-                        if denominator != FE::zero() {
-                            let mut a = b * &ct.qr + c * &ct.qo + &ct.qc;
-                            a = -a * denominator.inv();
-                            assignments.insert(constraint.l, a);
-                        } else {
-                            continue;
-                        }
-                    }
-                    ((Some(a), None, None), _) => {
-                        let b_coefficient = &ct.qr + a * &ct.qm;
-                        if b_coefficient == FE::zero() && ct.qo != FE::zero() {
-                            let c = -(a * &ct.ql + &ct.qc) * ct.qo.inv();
-                            assignments.insert(constraint.o, c);
-                        } else if b_coefficient != FE::zero() && ct.qo == FE::zero() {
-                            let b = -(a * &ct.ql + &ct.qc) * b_coefficient.inv();
-                            assignments.insert(constraint.r, b);
-                        } else {
-                            continue;
-                        }
-                    }
-                    ((None, Some(b), None), _) => {
-                        let a_coefficient = &ct.ql + b * &ct.qm;
-                        if a_coefficient == FE::zero() && ct.qo != FE::zero() {
-                            let c = -(b * &ct.qr + &ct.qc) * ct.qo.inv();
-                            assignments.insert(constraint.o, c);
-                        } else if a_coefficient != FE::zero() && ct.qo == FE::zero() {
-                            let a = -(b * &ct.qr + &ct.qc) * a_coefficient.inv();
-                            assignments.insert(constraint.l, a);
-                        } else {
-                            continue;
-                        }
-                    }
-                    ((None, None, Some(c)), (false, true, true, _)) => {
-                        let a = -(c * &ct.qo + &ct.qc) * ct.ql.inv();
-                        assignments.insert(constraint.l, a);
-                    }
-                    ((None, None, Some(c)), (true, false, true, _)) => {
-                        let b = -(c * &ct.qo + &ct.qc) * ct.qr.inv();
-                        assignments.insert(constraint.r, b);
-                    }
-                    ((None, None, None), (true, true, true, false)) => {
-                        let c = -&ct.qc * ct.qo.inv();
-                        assignments.insert(constraint.o, c);
-                    }
-                    ((None, None, None), (true, false, true, true)) => {
-                        let b = -&ct.qc * ct.qr.inv();
-                        assignments.insert(constraint.r, b);
-                    }
-                    ((None, None, None), (false, true, true, true)) => {
-                        let a = -&ct.qc * ct.ql.inv();
-                        assignments.insert(constraint.l, a);
-                    }
-                    _ => {
-                        continue;
-                    }
-                }
-                checked_constraints[i] = true;
-                number_solved += 1;
+                (assignments, number_solved) =
+                    solve_constraint_hint(assignments, constraint, number_solved);
+                (assignments, number_solved) =
+                    solve_constraint(assignments, constraint, number_solved);
             }
             if number_solved == old_solved {
                 break;
             }
         }
 
-        for (constraint, checked) in self.constraints.iter().zip(checked_constraints.iter()) {
-            if !checked {
-                let a = assignments.get(&constraint.l);
-                let b = assignments.get(&constraint.r);
-                let c = assignments.get(&constraint.o);
+        for constraint in self.constraints.iter() {
+            let a = assignments.get(&constraint.l);
+            let b = assignments.get(&constraint.r);
+            let c = assignments.get(&constraint.o);
 
-                match (a, b, c) {
-                    (Some(a), Some(b), Some(c)) => {
-                        let ct = &constraint.constraint_type;
-                        let result = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + c * &ct.qo + &ct.qc;
-                        if result != FE::zero() {
-                            return Err(());
-                        }
+            match (a, b, c) {
+                (Some(a), Some(b), Some(c)) => {
+                    let ct = &constraint.constraint_type;
+                    let result = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + c * &ct.qo + &ct.qc;
+                    if result != FE::zero() {
+                        return Err(());
                     }
-                    _ => return Err(()),
                 }
+                _ => return Err(()),
             }
         }
         Ok(assignments)
