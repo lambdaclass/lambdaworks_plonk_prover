@@ -53,15 +53,15 @@ fn solve_hint<F: IsField>(
     constraint: &Constraint<F>,
     mut number_solved: usize,
 ) -> (HashMap<Variable, FE<F>>, usize) {
-    let map = |column: &Column| match column {
+    let column_to_variable = |column: &Column| match column {
         Column::L => constraint.l,
         Column::R => constraint.r,
         Column::O => constraint.o,
     };
     if let Some(hint) = &constraint.hint {
-        if !assignments.contains_key(&map(&hint.output)) {
-            if let Some(input) = assignments.get(&map(&hint.input)) {
-                assignments.insert(map(&hint.output), (hint.function)(input));
+        if !assignments.contains_key(&column_to_variable(&hint.output)) {
+            if let Some(input) = assignments.get(&column_to_variable(&hint.input)) {
+                assignments.insert(column_to_variable(&hint.output), (hint.function)(input));
                 number_solved += 1;
             }
         }
