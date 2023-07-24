@@ -172,7 +172,9 @@ fn solve_constraint<F: IsField>(
 mod tests {
     use std::collections::HashMap;
 
-    use crate::constraint_system::{Constraint, ConstraintSystem, ConstraintType};
+    use crate::constraint_system::{
+        errors::SolverError, Constraint, ConstraintSystem, ConstraintType,
+    };
     use lambdaworks_math::field::{
         element::FieldElement as FE, fields::u64_prime_field::U64PrimeField,
     };
@@ -579,5 +581,71 @@ mod tests {
         assert_eq!(assignments.get(&a).unwrap(), &FE::from(1));
         assert_eq!(assignments.get(&b).unwrap(), &FE::from(2));
         assert_eq!(assignments.get(&c).unwrap(), &FE::from(3));
+    }
+
+    #[test]
+    fn test_inconsistent_system() {
+        let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
+        let a = system.new_variable();
+        let b = system.new_variable();
+        let constraint1 = Constraint {
+            constraint_type: ConstraintType {
+                ql: FE::one(),
+                qr: FE::one(),
+                qm: FE::zero(),
+                qo: FE::zero(),
+                qc: FE::one(),
+            },
+            hint: None,
+            l: a,
+            r: b,
+            o: system.null_variable(),
+        };
+        system.add_constraint(constraint1);
+        let constraint2 = Constraint {
+            constraint_type: ConstraintType {
+                ql: -FE::one(),
+                qr: FE::one(),
+                qm: FE::zero(),
+                qo: FE::zero(),
+                qc: FE::one(),
+            },
+            hint: None,
+            l: a,
+            r: b,
+            o: system.null_variable(),
+        };
+        let inputs = HashMap::from([(a, FE::from(2))]);
+        system.add_constraint(constraint2);
+        assert_eq!(
+            system.solve(inputs).unwrap_err(),
+            SolverError::InconsistentSystem
+        );
+    }
+
+    #[test]
+    fn test_indeterminate_system() {
+        let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
+        let a = system.new_variable();
+        let b = system.new_variable();
+        let constraint = Constraint {
+            constraint_type: ConstraintType {
+                ql: FE::one(),
+                qr: FE::one(),
+                qm: FE::zero(),
+                qo: FE::zero(),
+                qc: FE::one(),
+            },
+            hint: None,
+            l: a,
+            r: b,
+            o: system.null_variable(),
+        };
+        let inputs = HashMap::from([]);
+        system.add_constraint(constraint);
+        assert_eq!(
+            system.solve(inputs).unwrap_err(),
+            SolverError::IndeterminateSystem
+        );
     }
 }
