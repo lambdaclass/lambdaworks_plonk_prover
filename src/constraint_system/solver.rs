@@ -4,8 +4,8 @@ use lambdaworks_math::field::{element::FieldElement as FE, traits::IsField};
 
 use super::{Column, ConstraintSystem, Variable};
 
-/// Finds a solution of the system that extends the `assignments` map.
-/// If there is no such extension, it returns an error.
+/// Finds a solution to the system extending the `assignments` map.
+/// It returns an error in case there is no such solution.
 #[allow(unused)]
 impl<F> ConstraintSystem<F>
 where
