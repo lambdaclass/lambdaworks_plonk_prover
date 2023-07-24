@@ -85,9 +85,6 @@ fn solve_constraint<F: IsField>(
         (a, b, c),
         (ct.ql == zero, ct.qr == zero, ct.qm == zero, ct.qo == zero),
     ) {
-        ((Some(_), Some(_), Some(_)), _) => {
-            return (assignments, number_solved);
-        }
         ((Some(a), Some(b), None), _) => {
             if ct.qo != FE::zero() {
                 let mut c = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + &ct.qc;
