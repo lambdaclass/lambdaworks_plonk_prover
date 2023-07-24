@@ -59,12 +59,16 @@ where
                 let a = assignments.get(&constraint.l);
                 let b = assignments.get(&constraint.r);
                 let c = assignments.get(&constraint.o);
+                let zero = FE::zero();
 
-                match (a, b, c) {
-                    (Some(a), Some(b), Some(c)) => {
+                match (
+                    (a, b, c),
+                    (ct.ql == zero, ct.qr == zero, ct.qm == zero, ct.qo == zero),
+                ) {
+                    ((Some(a), Some(b), Some(c)), _) => {
                         continue;
                     }
-                    (Some(a), Some(b), None) => {
+                    ((Some(a), Some(b), None), _) => {
                         if ct.qo != FE::zero() {
                             let mut c = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + &ct.qc;
                             c = -c * ct.qo.inv();
@@ -73,7 +77,7 @@ where
                             continue;
                         }
                     }
-                    (Some(a), None, Some(c)) => {
+                    ((Some(a), None, Some(c)), _) => {
                         let denominator = &ct.qr + a * &ct.qm;
                         if denominator != FE::zero() {
                             let mut b = a * &ct.ql + c * &ct.qo + &ct.qc;
@@ -83,7 +87,7 @@ where
                             continue;
                         }
                     }
-                    (None, Some(b), Some(c)) => {
+                    ((None, Some(b), Some(c)), _) => {
                         let denominator = &ct.ql + b * &ct.qm;
                         if denominator != FE::zero() {
                             let mut a = b * &ct.qr + c * &ct.qo + &ct.qc;
@@ -93,7 +97,7 @@ where
                             continue;
                         }
                     }
-                    (Some(a), None, None) => {
+                    ((Some(a), None, None), _) => {
                         let b_coefficient = &ct.qr + a * &ct.qm;
                         if b_coefficient == FE::zero() && ct.qo != FE::zero() {
                             let c = -(a * &ct.ql + &ct.qc) * ct.qo.inv();
@@ -105,7 +109,7 @@ where
                             continue;
                         }
                     }
-                    (None, Some(b), None) => {
+                    ((None, Some(b), None), _) => {
                         let a_coefficient = &ct.ql + b * &ct.qm;
                         if a_coefficient == FE::zero() && ct.qo != FE::zero() {
                             let c = -(b * &ct.qr + &ct.qc) * ct.qo.inv();
@@ -117,42 +121,28 @@ where
                             continue;
                         }
                     }
-                    (None, None, Some(c)) => {
-                        if ct.qm != FE::zero() {
-                            continue;
-                        } else if ct.ql != FE::zero() && ct.qr == FE::zero() {
-                            let a = -(c * &ct.qo + &ct.qc) * ct.ql.inv();
-                            assignments.insert(constraint.l, a);
-                        } else if ct.ql == FE::zero() && ct.qr != FE::zero() {
-                            let b = -(c * &ct.qo + &ct.qc) * ct.qr.inv();
-                            assignments.insert(constraint.r, b);
-                        } else {
-                            continue;
-                        }
+                    ((None, None, Some(c)), (false, true, true, _)) => {
+                        let a = -(c * &ct.qo + &ct.qc) * ct.ql.inv();
+                        assignments.insert(constraint.l, a);
                     }
-                    (None, None, None) => {
-                        match (
-                            ct.ql == FE::zero(),
-                            ct.qr == FE::zero(),
-                            ct.qm == FE::zero(),
-                            ct.qo == FE::zero(),
-                        ) {
-                            (true, true, true, false) => {
-                                let c = -&ct.qc * ct.qo.inv();
-                                assignments.insert(constraint.o, c);
-                            }
-                            (true, false, true, true) => {
-                                let b = -&ct.qc * ct.qr.inv();
-                                assignments.insert(constraint.r, b);
-                            }
-                            (false, true, true, true) => {
-                                let a = -&ct.qc * ct.ql.inv();
-                                assignments.insert(constraint.l, a);
-                            }
-                            _ => {
-                                continue;
-                            }
-                        }
+                    ((None, None, Some(c)), (true, false, true, _)) => {
+                        let b = -(c * &ct.qo + &ct.qc) * ct.qr.inv();
+                        assignments.insert(constraint.r, b);
+                    }
+                    ((None, None, None), (true, true, true, false)) => {
+                        let c = -&ct.qc * ct.qo.inv();
+                        assignments.insert(constraint.o, c);
+                    }
+                    ((None, None, None), (true, false, true, true)) => {
+                        let b = -&ct.qc * ct.qr.inv();
+                        assignments.insert(constraint.r, b);
+                    }
+                    ((None, None, None), (false, true, true, true)) => {
+                        let a = -&ct.qc * ct.ql.inv();
+                        assignments.insert(constraint.l, a);
+                    }
+                    _ => {
+                        continue;
                     }
                 }
                 checked_constraints[i] = true;
