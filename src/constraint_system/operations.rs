@@ -1,107 +1,14 @@
-use lambdaworks_math::field::{
-    element::FieldElement as FE,
-    traits::{IsField, IsPrimeField},
-};
-use std::collections::HashMap;
+use lambdaworks_math::field::{element::FieldElement as FE, traits::IsField};
 
-// a Ql + b Qr + a b Qm + c Qo + Qc = 0
-#[derive(Clone)]
-pub struct ConstraintType<F: IsField> {
-    pub ql: FE<F>,
-    pub qr: FE<F>,
-    pub qm: FE<F>,
-    pub qo: FE<F>,
-    pub qc: FE<F>,
-}
-
-#[derive(Clone)]
-enum Column {
-    L,
-    R,
-    O,
-}
-
-#[allow(unused)]
-#[derive(Clone)]
-pub struct Hint<F: IsField> {
-    function: fn(&FE<F>) -> FE<F>,
-    input: Column,
-    output: Column,
-}
-
-#[allow(unused)]
-pub type Variable = usize;
-
-#[allow(unused)]
-#[derive(Clone)]
-pub struct Constraint<F: IsField> {
-    pub constraint_type: ConstraintType<F>,
-    hint: Option<Hint<F>>,
-    pub l: Variable,
-    pub r: Variable,
-    pub o: Variable,
-}
-
-#[allow(unused)]
-pub struct ConstraintSystem<F: IsField> {
-    num_variables: usize,
-    pub public_input_variables: Vec<Variable>,
-    pub constraints: Vec<Constraint<F>>,
-}
+use super::{Column, Constraint, ConstraintSystem, ConstraintType, Hint, Variable};
 
 #[allow(unused)]
 impl<F> ConstraintSystem<F>
 where
     F: IsField,
 {
-    fn new() -> Self {
-        Self {
-            num_variables: 0,
-            public_input_variables: Vec::new(),
-            constraints: Vec::new(),
-        }
-    }
-
-    pub fn null_variable(&self) -> Variable {
-        0
-    }
-
-    fn new_variable(&mut self) -> Variable {
-        let variable_id = self.num_variables;
-        self.num_variables += 1;
-        variable_id
-    }
-
-    fn new_public_input(&mut self) -> Variable {
-        let new_variable = self.new_variable();
-        self.public_input_variables.push(new_variable);
-        new_variable
-    }
-
-    fn new_constant(&mut self, value: FE<F>) -> Variable {
-        let constant = self.new_variable();
-        self.add_constraint(Constraint {
-            constraint_type: ConstraintType {
-                ql: -FE::one(),
-                qr: FE::zero(),
-                qm: FE::zero(),
-                qo: FE::zero(),
-                qc: value,
-            },
-            l: constant,
-            r: self.null_variable(),
-            o: self.null_variable(),
-            hint: None,
-        });
-        constant
-    }
-
-    fn add_constraint(&mut self, constraint: Constraint<F>) {
-        self.constraints.push(constraint);
-    }
-
     /// Generates a new variable `v = c1 * v1 + c2 * v2 + b`
-    fn linear_combination(
+    pub fn linear_combination(
         &mut self,
         v1: &Variable,
         c1: FE<F>,
@@ -129,7 +36,7 @@ where
     }
 
     /// Generates a new variables `w = c * v + b`
-    fn linear_function(
+    pub fn linear_function(
         &mut self,
         v: &Variable,
         c: FE<F>,
@@ -153,15 +60,15 @@ where
         result
     }
 
-    fn add(&mut self, v1: &Variable, v2: &Variable) -> Variable {
+    pub fn add(&mut self, v1: &Variable, v2: &Variable) -> Variable {
         self.linear_combination(v1, FE::one(), v2, FE::one(), FE::zero(), None)
     }
 
-    fn add_constant(&mut self, v: &Variable, constant: FE<F>) -> Variable {
+    pub fn add_constant(&mut self, v: &Variable, constant: FE<F>) -> Variable {
         self.linear_function(v, FE::one(), constant, None)
     }
 
-    fn mul(&mut self, v1: &Variable, v2: &Variable) -> Variable {
+    pub fn mul(&mut self, v1: &Variable, v2: &Variable) -> Variable {
         let result = self.new_variable();
         self.add_constraint(Constraint {
             constraint_type: ConstraintType {
@@ -198,88 +105,7 @@ where
         result
     }
 
-    fn new_boolean(&mut self) -> Variable {
-        let boolean = self.new_variable();
-        self.add_constraint(Constraint {
-            constraint_type: ConstraintType {
-                ql: -FE::one(),
-                qr: FE::zero(),
-                qm: FE::one(),
-                qo: FE::zero(),
-                qc: FE::zero(),
-            },
-            l: boolean,
-            r: boolean,
-            o: self.null_variable(),
-            hint: None,
-        });
-        boolean
-    }
-
-    fn new_u32(&mut self, v: &Variable) -> Vec<Variable>
-    where
-        F: IsPrimeField,
-    {
-        let bits: Vec<_> = (0..32).map(|_| self.new_boolean()).collect();
-        let mut aux_vars: Vec<Variable> = Vec::new();
-        let hint_function = |v: &FE<F>| {
-            if v.representative() & 1.into() == 1.into() {
-                FE::one()
-            } else {
-                FE::zero()
-            }
-        };
-
-        let hint = Some(Hint {
-            function: hint_function,
-            input: Column::O,
-            output: Column::R,
-        });
-        // t1 := 2 b_0 + b_1
-        let t_0 = self.linear_combination(
-            &bits[0],
-            FE::from(2),
-            &bits[1],
-            FE::one(),
-            FE::zero(),
-            hint.clone(),
-        );
-        aux_vars.push(t_0);
-        for bit in bits.iter().take(32).skip(2) {
-            // t_i := 2 t_{i-1} + b_i
-            let t_i = self.linear_combination(
-                aux_vars.last().unwrap(),
-                FE::from(2),
-                bit,
-                FE::one(),
-                FE::zero(),
-                hint.clone(),
-            );
-            aux_vars.push(t_i);
-        }
-        self.assert_eq(v, aux_vars.last().unwrap());
-        bits
-    }
-
-    fn not(&mut self, v: &Variable) -> Variable {
-        let result = self.new_variable();
-        self.add_constraint(Constraint {
-            constraint_type: ConstraintType {
-                ql: FE::one(),
-                qr: FE::one(),
-                qm: FE::zero(),
-                qo: FE::zero(),
-                qc: -FE::one(),
-            },
-            l: *v,
-            r: result,
-            o: self.null_variable(),
-            hint: None,
-        });
-        result
-    }
-
-    fn inv(&mut self, v: &Variable) -> (Variable, Variable) {
+    pub fn inv(&mut self, v: &Variable) -> (Variable, Variable) {
         let is_zero = self.new_variable();
         let v_inverse = self.new_variable();
         let hint = Some(Hint {
@@ -334,279 +160,36 @@ where
         (is_zero, v_inverse)
     }
 
-    fn assert_eq(&mut self, v1: &Variable, v2: &Variable) {
+    pub fn not(&mut self, v: &Variable) -> Variable {
+        let result = self.new_variable();
         self.add_constraint(Constraint {
             constraint_type: ConstraintType {
                 ql: FE::one(),
-                qr: -FE::one(),
+                qr: FE::one(),
                 qm: FE::zero(),
                 qo: FE::zero(),
-                qc: FE::zero(),
+                qc: -FE::one(),
             },
-            l: *v1,
-            r: *v2,
+            l: *v,
+            r: result,
             o: self.null_variable(),
             hint: None,
         });
+        result
     }
-
-    fn if_else(&mut self, boolean_condition: &Variable, v1: &Variable, v2: &Variable) -> Variable {
-        let not_boolean_condition = self.not(boolean_condition);
-        let if_branch = self.mul(v1, boolean_condition);
-        let else_branch = self.mul(v2, &not_boolean_condition);
-        self.add(&if_branch, &else_branch)
-    }
-
-    fn if_nonzero_else(&mut self, condition: &Variable, v1: &Variable, v2: &Variable) -> Variable {
-        let (is_zero, _) = self.inv(condition);
-        self.if_else(&is_zero, v2, v1)
-    }
-
-    pub fn padding_constraint(&self) -> Constraint<F> {
-        let zero = FE::zero();
-        Constraint {
-            constraint_type: ConstraintType {
-                ql: zero.clone(),
-                qr: zero.clone(),
-                qm: zero.clone(),
-                qo: zero.clone(),
-                qc: zero,
-            },
-            hint: None,
-            l: self.null_variable(),
-            r: self.null_variable(),
-            o: self.null_variable(),
-        }
-    }
-
-    pub fn solve(
-        &self,
-        mut assignments: HashMap<Variable, FE<F>>,
-    ) -> Result<(HashMap<Variable, FE<F>>), ()> {
-        let mut number_solved = 0;
-        let mut checked_constraints = vec![false; self.constraints.len()];
-        loop {
-            let old_solved = number_solved;
-            for (i, constraint) in self.constraints.iter().enumerate() {
-                let ct = &constraint.constraint_type;
-                let mut has_l = assignments.contains_key(&constraint.l);
-                let mut has_r = assignments.contains_key(&constraint.r);
-                let mut has_o = assignments.contains_key(&constraint.o);
-
-                if let Some(hint) = &constraint.hint {
-                    let function = hint.function;
-                    match (&hint.input, &hint.output, has_l, has_r, has_o) {
-                        (Column::L, Column::R, true, false, _) => {
-                            assignments.insert(
-                                constraint.r,
-                                function(assignments.get(&constraint.l).unwrap()),
-                            );
-                            number_solved += 1;
-                            has_r = true;
-                        }
-                        (Column::L, Column::O, true, _, false) => {
-                            assignments.insert(
-                                constraint.o,
-                                function(assignments.get(&constraint.l).unwrap()),
-                            );
-                            has_o = true;
-                            number_solved += 1;
-                        }
-                        (Column::R, Column::L, false, true, _) => {
-                            assignments.insert(
-                                constraint.l,
-                                function(assignments.get(&constraint.r).unwrap()),
-                            );
-                            has_l = true;
-                            number_solved += 1;
-                        }
-                        (Column::R, Column::O, _, true, false) => {
-                            assignments.insert(
-                                constraint.o,
-                                function(assignments.get(&constraint.r).unwrap()),
-                            );
-                            has_o = true;
-                            number_solved += 1;
-                        }
-                        (Column::O, Column::L, false, _, true) => {
-                            assignments.insert(
-                                constraint.l,
-                                function(assignments.get(&constraint.o).unwrap()),
-                            );
-                            has_l = true;
-                            number_solved += 1;
-                        }
-                        (Column::O, Column::R, _, false, true) => {
-                            assignments.insert(
-                                constraint.r,
-                                function(assignments.get(&constraint.o).unwrap()),
-                            );
-                            has_r = true;
-                            number_solved += 1;
-                        }
-                        _ => {}
-                    }
-                }
-
-                // a Ql + b Qr + a b Qm + c Qo + Qc = 0
-                if has_l && has_r && has_o {
-                    continue;
-                } else if has_l && has_r {
-                    let a = assignments.get(&constraint.l).unwrap();
-                    let b = assignments.get(&constraint.r).unwrap();
-                    let mut c = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + &ct.qc;
-                    if ct.qo == FE::zero() {
-                        continue;
-                    }
-                    c = -c * ct.qo.inv();
-                    assignments.insert(constraint.o, c);
-                } else if has_l && has_o {
-                    let a = assignments.get(&constraint.l).unwrap();
-                    let c = assignments.get(&constraint.o).unwrap();
-                    let mut b = a * &ct.ql + c * &ct.qo + &ct.qc;
-                    let denominator = &ct.qr + a * &ct.qm;
-                    if denominator == FE::zero() {
-                        continue;
-                    }
-                    b = -b * denominator.inv();
-                    assignments.insert(constraint.r, b);
-                } else if has_r && has_o {
-                    let b = assignments.get(&constraint.r).unwrap();
-                    let c = assignments.get(&constraint.o).unwrap();
-                    let mut a = b * &ct.qr + c * &ct.qo + &ct.qc;
-                    let denominator = &ct.ql + b * &ct.qm;
-                    if denominator == FE::zero() {
-                        continue;
-                    }
-                    a = -a * denominator.inv();
-                    assignments.insert(constraint.l, a);
-                } else {
-                    continue;
-                }
-                checked_constraints[i] = true;
-                number_solved += 1;
-            }
-            if number_solved == old_solved {
-                break;
-            }
-        }
-        for (constraint, checked) in self.constraints.iter().zip(checked_constraints.iter()) {
-            if !checked {
-                let a = assignments.get(&constraint.l);
-                let b = assignments.get(&constraint.r);
-                let c = assignments.get(&constraint.o);
-
-                match (a, b, c) {
-                    (Some(a), Some(b), Some(c)) => {
-                        let ct = &constraint.constraint_type;
-                        let result = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + c * &ct.qo + &ct.qc;
-                        if result != FE::zero() {
-                            return Err(());
-                        }
-                    }
-                    _ => return Err(()),
-                }
-            }
-        }
-        Ok(assignments)
-    }
-
-    fn public_input_header(&self) -> Vec<Constraint<F>> {
-        let zero = FE::zero();
-        let minus_one = -FE::one();
-        let mut public_input_constraints = Vec::new();
-        for public_input in self.public_input_variables.iter() {
-            let public_input_constraint = Constraint {
-                constraint_type: ConstraintType {
-                    ql: minus_one.clone(),
-                    qr: zero.clone(),
-                    qm: zero.clone(),
-                    qo: zero.clone(),
-                    qc: zero.clone(),
-                },
-                hint: None,
-                l: *public_input,
-                r: self.null_variable(),
-                o: self.null_variable(),
-            };
-            public_input_constraints.push(public_input_constraint);
-        }
-        public_input_constraints
-    }
-
-    pub fn to_matrices(&self) -> (Vec<Variable>, Vec<FE<F>>) {
-        let header = self.public_input_header();
-        let body = &self.constraints;
-        let total_length = (header.len() + body.len()).next_power_of_two();
-        let pad = vec![self.padding_constraint(); total_length - header.len() - body.len()];
-
-        let mut full_constraints = header;
-        full_constraints.extend_from_slice(body);
-        full_constraints.extend_from_slice(&pad);
-
-        let n = full_constraints.len();
-
-        let mut lro = vec![self.null_variable(); n * 3];
-        // Make a single vector with | a_1 .. a_m | b_1 .. b_m | c_1 .. c_m | concatenated.
-        for (index, constraint) in full_constraints.iter().enumerate() {
-            lro[index] = constraint.l;
-            lro[index + n] = constraint.r;
-            lro[index + n * 2] = constraint.o;
-        }
-
-        let mut q = vec![FE::zero(); 5 * n];
-        for (index, constraint) in full_constraints.iter().enumerate() {
-            let ct = &constraint.constraint_type;
-            q[index] = ct.ql.clone();
-            q[index + n] = ct.qr.clone();
-            q[index + 2 * n] = ct.qm.clone();
-            q[index + 3 * n] = ct.qo.clone();
-            q[index + 4 * n] = ct.qc.clone();
-        }
-        (lro, q)
-    }
-
-    fn public_input_values(&self, values: &HashMap<Variable, FE<F>>) -> Vec<FE<F>> {
-        let mut public_inputs = Vec::new();
-        for key in &self.public_input_variables {
-            if let Some(value) = values.get(key) {
-                public_inputs.push(value.clone());
-            }
-        }
-        public_inputs
-    }
-}
-
-pub fn get_permutation(lro: &[Variable]) -> Vec<usize> {
-    // For each variable store the indexes where it appears.
-    let mut last_usage: HashMap<Variable, usize> = HashMap::new();
-    let mut permutation = vec![0_usize; lro.len()];
-
-    for _ in 0..2 {
-        for (index, variable) in lro.iter().enumerate() {
-            if last_usage.contains_key(variable) {
-                permutation[index] = last_usage[variable];
-            }
-            last_usage.insert(*variable, index);
-        }
-    }
-
-    permutation
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        prover::Prover,
-        setup::{setup, CommonPreprocessedInput, Witness},
-        test_utils::utils::{test_srs, TestRandomFieldGenerator, KZG, ORDER_R_MINUS_1_ROOT_UNITY},
-        verifier::Verifier,
-    };
+    use std::collections::HashMap;
 
     use super::*;
     use lambdaworks_math::{
         elliptic_curve::short_weierstrass::curves::bls12_381::default_types::FrField,
-        field::{element::FieldElement as FE, fields::u64_prime_field::U64PrimeField},
+        field::{
+            element::FieldElement as FE, fields::u64_prime_field::U64PrimeField,
+            traits::IsPrimeField,
+        },
     };
 
     /*
@@ -628,72 +211,6 @@ mod tests {
     Permutation: 11  4  8  0  1  3  9  5  2  6 10  7
 
     */
-    #[test]
-    fn test_permutation() {
-        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
-
-        let v0 = system.new_variable();
-        let v1 = system.new_variable();
-
-        let v2 = system.add(&v0, &v1);
-        let v3 = system.add(&v1, &v0);
-        system.add(&v2, &v3);
-
-        let (lro, _) = system.to_matrices();
-
-        let permutation = get_permutation(&lro);
-        let expected = vec![11, 4, 8, 0, 1, 3, 9, 5, 2, 6, 10, 7];
-        assert_eq!(expected, permutation);
-    }
-
-    #[test]
-    fn test_prove_simple_program_1() {
-        // Program
-        let system = &mut ConstraintSystem::<FrField>::new();
-
-        let e = system.new_variable();
-        let x = system.new_public_input();
-        let y = system.new_public_input();
-
-        let z = system.mul(&x, &e);
-        system.assert_eq(&y, &z);
-
-        // Common preprocessed input
-        let common_preprocessed_input =
-            CommonPreprocessedInput::from_constraint_system(&system, &ORDER_R_MINUS_1_ROOT_UNITY);
-
-        // Setup
-        let srs = test_srs(common_preprocessed_input.n);
-        let kzg = KZG::new(srs);
-        let verifying_key = setup(&common_preprocessed_input, &kzg);
-
-        // Prover:
-        // 1. Generate public inputs and witness
-        let inputs = HashMap::from([(x, FE::from(4)), (e, FE::from(3))]);
-        let assignments = system.solve(inputs).unwrap();
-        let public_inputs = system.public_input_values(&assignments);
-        let witness = Witness::new(assignments, &system);
-
-        // 2. Generate proof
-        let random_generator = TestRandomFieldGenerator {};
-        let prover = Prover::new(kzg.clone(), random_generator);
-        let proof = prover.prove(
-            &witness,
-            &public_inputs,
-            &common_preprocessed_input,
-            &verifying_key,
-        );
-
-        // Verifier
-        let verifier = Verifier::new(kzg);
-        assert!(verifier.verify(
-            &proof,
-            &public_inputs,
-            &common_preprocessed_input,
-            &verifying_key
-        ));
-    }
-
     #[test]
     fn test_linear_combination() {
         let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
@@ -830,75 +347,6 @@ mod tests {
 
         assert_eq!(assignments.get(&w_inverse).unwrap(), &FE::from(0));
         assert_eq!(assignments.get(&w_is_zero).unwrap(), &FE::one());
-    }
-
-    #[test]
-    fn test_assert_eq_1() {
-        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
-
-        let v = system.new_variable();
-        let w = system.new_variable();
-        let z = system.mul(&v, &w);
-        let output = system.new_variable();
-        system.assert_eq(&z, &output);
-
-        let inputs = HashMap::from([(v, FE::from(2)), (w, FE::from(2).inv())]);
-
-        let assignments = system.solve(inputs).unwrap();
-        assert_eq!(assignments.get(&output).unwrap(), &FE::one());
-    }
-
-    #[test]
-    fn test_assert_eq_2() {
-        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
-
-        let v = system.new_variable();
-        let w = system.new_variable();
-        let z = system.mul(&v, &w);
-        let output = system.new_variable();
-        system.assert_eq(&z, &output);
-
-        let inputs = HashMap::from([(v, FE::from(2)), (w, FE::from(2)), (output, FE::from(1))]);
-
-        let _assignments = system.solve(inputs).unwrap_err();
-    }
-
-    #[test]
-    fn test_if_nonzero_else_1() {
-        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
-
-        let v = system.new_variable();
-        let v2 = system.mul(&v, &v);
-        let v4 = system.mul(&v2, &v2);
-        let w = system.add_constant(&v4, -FE::one());
-        let output = system.if_nonzero_else(&w, &v, &v2);
-
-        let inputs = HashMap::from([(v, FE::from(256))]);
-
-        let assignments = system.solve(inputs).unwrap();
-        assert_eq!(
-            assignments.get(&output).unwrap(),
-            assignments.get(&v2).unwrap()
-        );
-    }
-
-    #[test]
-    fn test_if_nonzero_else_2() {
-        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
-
-        let v = system.new_variable();
-        let v2 = system.mul(&v, &v);
-        let v4 = system.mul(&v2, &v2);
-        let w = system.add_constant(&v4, -FE::one());
-        let output = system.if_nonzero_else(&w, &v, &v2);
-
-        let inputs = HashMap::from([(v, FE::from(255))]);
-
-        let assignments = system.solve(inputs).unwrap();
-        assert_eq!(
-            assignments.get(&output).unwrap(),
-            assignments.get(&v).unwrap()
-        );
     }
 
     #[test]
