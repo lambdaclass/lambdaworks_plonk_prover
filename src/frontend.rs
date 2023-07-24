@@ -957,10 +957,10 @@ mod tests {
     fn test_fibonacci() {
         let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
 
-        let mut x0 = system.new_variable();
-        let x0_initial = x0.clone();
-        let mut x1 = system.new_variable();
-        let x1_initial = x1.clone();
+        let x0_initial = system.new_variable();
+        let x1_initial = system.new_variable();
+        let mut x0 = x0_initial.clone();
+        let mut x1 = x1_initial.clone();
 
         for _ in 2..10001 {
             let x2 = system.add(&x1, &x0);
@@ -981,8 +981,8 @@ mod tests {
     ) -> Variable {
         let mut h = system.new_constant(FE::zero());
 
-        for stream in data.iter() {
-            let mut x = *stream;
+        for item in data.iter() {
+            let mut x = *item;
             for c in coefficients.iter() {
                 // x = (x + h + c) ** 5
                 x = system.linear_combination(&x, FE::one(), &h, FE::one(), c.clone(), None);
@@ -992,7 +992,7 @@ mod tests {
             }
             // h = x + 2h + stream
             h = system.linear_combination(&x, FE::one(), &h, FE::from(2), FE::zero(), None);
-            h = system.add(&h, &stream);
+            h = system.add(&h, &item);
         }
         h
     }
