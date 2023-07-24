@@ -1,4 +1,5 @@
 pub mod conditional;
+pub mod examples;
 pub mod operations;
 pub mod solver;
 pub mod types;
@@ -285,5 +286,26 @@ mod tests {
             &common_preprocessed_input,
             &verifying_key
         ));
+    }
+
+    #[test]
+    fn test_fibonacci() {
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let x0_initial = system.new_variable();
+        let x1_initial = system.new_variable();
+        let mut x0 = x0_initial.clone();
+        let mut x1 = x1_initial.clone();
+
+        for _ in 2..10001 {
+            let x2 = system.add(&x1, &x0);
+            (x0, x1) = (x1, x2);
+        }
+
+        let inputs = HashMap::from([(x0_initial, FE::from(0)), (x1_initial, FE::from(1))]);
+
+        let expected_output = FE::from(19257);
+        let assignments = system.solve(inputs).unwrap();
+        assert_eq!(assignments.get(&x1).unwrap(), &expected_output);
     }
 }
