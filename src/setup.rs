@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::frontend::{get_permutation, ConstraintSystem, Variable};
+use crate::constraint_system::frontend::{get_permutation, ConstraintSystem, Variable};
 use crate::test_utils::utils::{generate_domain, generate_permutation_coefficients};
 use lambdaworks_crypto::commitments::traits::IsCommitmentScheme;
 use lambdaworks_crypto::fiat_shamir::default_transcript::DefaultTranscript;
