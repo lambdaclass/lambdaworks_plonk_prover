@@ -21,65 +21,44 @@ where
             let old_solved = number_solved;
             for (i, constraint) in self.constraints.iter().enumerate() {
                 let ct = &constraint.constraint_type;
-                let mut has_l = assignments.contains_key(&constraint.l);
-                let mut has_r = assignments.contains_key(&constraint.r);
-                let mut has_o = assignments.contains_key(&constraint.o);
+                let a = assignments.get(&constraint.l);
+                let b = assignments.get(&constraint.r);
+                let c = assignments.get(&constraint.o);
 
                 if let Some(hint) = &constraint.hint {
                     let function = hint.function;
-                    match (&hint.input, &hint.output, has_l, has_r, has_o) {
-                        (Column::L, Column::R, true, false, _) => {
-                            assignments.insert(
-                                constraint.r,
-                                function(assignments.get(&constraint.l).unwrap()),
-                            );
-                            number_solved += 1;
-                            has_r = true;
-                        }
-                        (Column::L, Column::O, true, _, false) => {
-                            assignments.insert(
-                                constraint.o,
-                                function(assignments.get(&constraint.l).unwrap()),
-                            );
-                            has_o = true;
+                    match (&hint.input, &hint.output, a, b, c) {
+                        (Column::L, Column::R, Some(a), None, _) => {
+                            assignments.insert(constraint.r, function(a));
                             number_solved += 1;
                         }
-                        (Column::R, Column::L, false, true, _) => {
-                            assignments.insert(
-                                constraint.l,
-                                function(assignments.get(&constraint.r).unwrap()),
-                            );
-                            has_l = true;
+                        (Column::L, Column::O, Some(a), _, None) => {
+                            assignments.insert(constraint.o, function(a));
                             number_solved += 1;
                         }
-                        (Column::R, Column::O, _, true, false) => {
-                            assignments.insert(
-                                constraint.o,
-                                function(assignments.get(&constraint.r).unwrap()),
-                            );
-                            has_o = true;
+                        (Column::R, Column::L, None, Some(b), _) => {
+                            assignments.insert(constraint.l, function(b));
                             number_solved += 1;
                         }
-                        (Column::O, Column::L, false, _, true) => {
-                            assignments.insert(
-                                constraint.l,
-                                function(assignments.get(&constraint.o).unwrap()),
-                            );
-                            has_l = true;
+                        (Column::R, Column::O, _, Some(b), None) => {
+                            assignments.insert(constraint.o, function(b));
                             number_solved += 1;
                         }
-                        (Column::O, Column::R, _, false, true) => {
-                            assignments.insert(
-                                constraint.r,
-                                function(assignments.get(&constraint.o).unwrap()),
-                            );
-                            has_r = true;
+                        (Column::O, Column::L, None, _, Some(c)) => {
+                            assignments.insert(constraint.l, function(c));
+                            number_solved += 1;
+                        }
+                        (Column::O, Column::R, _, None, Some(c)) => {
+                            assignments.insert(constraint.r, function(c));
                             number_solved += 1;
                         }
                         _ => {}
                     }
                 }
 
+                let mut has_l = assignments.contains_key(&constraint.l);
+                let mut has_r = assignments.contains_key(&constraint.r);
+                let mut has_o = assignments.contains_key(&constraint.o);
                 // a Ql + b Qr + a b Qm + c Qo + Qc = 0
                 if has_l && has_r && has_o {
                     continue;
