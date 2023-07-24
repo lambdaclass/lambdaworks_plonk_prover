@@ -384,7 +384,7 @@ mod tests {
             hint: None,
             l: a,
             r: b,
-            o: system.null_variable(),
+            o: c,
         };
         let constraint2 = Constraint {
             constraint_type: ConstraintType {
