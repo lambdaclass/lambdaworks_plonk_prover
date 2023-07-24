@@ -1,2 +1,2 @@
-pub mod pow;
 pub mod mimc;
+pub mod pow;

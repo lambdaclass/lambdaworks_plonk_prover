@@ -91,3 +91,73 @@ where
         bits
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use lambdaworks_math::field::{element::FieldElement, fields::u64_prime_field::U64PrimeField};
+
+    use crate::constraint_system::ConstraintSystem;
+
+    #[test]
+    fn test_constant() {
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+        let variable = system.new_variable();
+        let constant = system.new_constant(FieldElement::from(17));
+        system.assert_eq(&variable, &constant);
+        let inputs = HashMap::new();
+        let assignments = system.solve(inputs).unwrap();
+        assert_eq!(assignments.get(&constant).unwrap(), &FieldElement::from(17));
+    }
+
+    #[test]
+    fn test_boolean_1() {
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let boolean = system.new_boolean();
+        let inputs = HashMap::from([(boolean, FieldElement::from(2))]);
+        // system is inconsistent
+        system.solve(inputs).unwrap_err();
+    }
+
+    #[test]
+    fn test_boolean_2() {
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let boolean = system.new_boolean();
+        let inputs = HashMap::from([(boolean, FieldElement::from(1))]);
+        // system is solvable
+        system.solve(inputs).unwrap();
+    }
+
+    #[test]
+    fn test_boolean_3() {
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let boolean = system.new_boolean();
+        let inputs = HashMap::from([(boolean, FieldElement::from(0))]);
+        // system is solvable
+        system.solve(inputs).unwrap();
+    }
+
+    #[test]
+    fn test_u32() {
+        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
+
+        let input = system.new_variable();
+        let u32_var = system.new_u32(&input);
+
+        let a = 59049;
+        let inputs = HashMap::from([(input, FieldElement::from(a))]);
+
+        let assignments = system.solve(inputs).unwrap();
+
+        for i in 0..32 {
+            assert_eq!(
+                assignments.get(&u32_var[i]).unwrap().representative(),
+                (a >> (31 - i)) & 1
+            );
+        }
+    }
+}

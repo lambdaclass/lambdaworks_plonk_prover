@@ -1,8 +1,6 @@
-use lambdaworks_math::field::{traits::IsField, element::FieldElement as FE};
+use lambdaworks_math::field::{element::FieldElement as FE, traits::IsField};
 
 use crate::constraint_system::{ConstraintSystem, Variable};
-
-
 
 #[allow(unused)]
 pub fn mimc<F: IsField>(
@@ -32,9 +30,12 @@ pub fn mimc<F: IsField>(
 pub mod tests {
     use std::collections::HashMap;
 
-    use lambdaworks_math::{field::element::FieldElement as FE, elliptic_curve::short_weierstrass::curves::bls12_381::default_types::FrField};
+    use lambdaworks_math::{
+        elliptic_curve::short_weierstrass::curves::bls12_381::default_types::FrField,
+        field::element::FieldElement as FE,
+    };
 
-    use crate::constraint_system::{ConstraintSystem, examples::mimc::mimc};
+    use crate::constraint_system::{examples::mimc::mimc, ConstraintSystem};
 
     #[test]
     fn test_mimc() {

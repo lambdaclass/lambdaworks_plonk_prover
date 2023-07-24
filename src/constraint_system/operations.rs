@@ -325,24 +325,4 @@ mod tests {
         assert_eq!(assignments.get(&w_inverse).unwrap(), &FE::from(0));
         assert_eq!(assignments.get(&w_is_zero).unwrap(), &FE::one());
     }
-
-    #[test]
-    fn test_u32() {
-        let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
-
-        let input = system.new_variable();
-        let u32_var = system.new_u32(&input);
-
-        let a = 59049;
-        let inputs = HashMap::from([(input, FE::from(a))]);
-
-        let assignments = system.solve(inputs).unwrap();
-
-        for i in 0..32 {
-            assert_eq!(
-                assignments.get(&u32_var[i]).unwrap().representative(),
-                (a >> (31 - i)) & 1
-            );
-        }
-    }
 }
