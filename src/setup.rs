@@ -20,9 +20,9 @@ pub struct Witness<F: IsField> {
 
 impl<F: IsField> Witness<F> {
     pub fn new(values: HashMap<Variable, FieldElement<F>>, system: &ConstraintSystem<F>) -> Self {
-        let (q, _) = system.to_matrices();
-        let abc: Vec<_> = q.iter().map(|v| values[v].clone()).collect();
-        let n = q.len() / 3;
+        let (lro, _) = system.to_matrices();
+        let abc: Vec<_> = lro.iter().map(|v| values[v].clone()).collect();
+        let n = lro.len() / 3;
 
         Self {
             a: abc[..n].to_vec(),

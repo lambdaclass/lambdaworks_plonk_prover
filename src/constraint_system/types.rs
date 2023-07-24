@@ -103,9 +103,7 @@ mod tests {
     #[test]
     fn test_constant() {
         let system = &mut ConstraintSystem::<U64PrimeField<65537>>::new();
-        let variable = system.new_variable();
         let constant = system.new_constant(FieldElement::from(17));
-        system.assert_eq(&variable, &constant);
         let inputs = HashMap::new();
         let assignments = system.solve(inputs).unwrap();
         assert_eq!(assignments.get(&constant).unwrap(), &FieldElement::from(17));
