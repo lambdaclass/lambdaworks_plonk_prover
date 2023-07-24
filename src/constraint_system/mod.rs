@@ -1,4 +1,5 @@
 pub mod conditional;
+pub mod errors;
 pub mod examples;
 pub mod operations;
 pub mod solver;
@@ -18,7 +19,7 @@ struct ConstraintType<F: IsField> {
     qc: FieldElement<F>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Column {
     L,
     R,
@@ -168,6 +169,12 @@ where
             }
         }
         public_inputs
+    }
+}
+
+impl<F: IsField> Default for ConstraintSystem<F> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

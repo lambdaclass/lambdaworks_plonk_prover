@@ -2,47 +2,71 @@ use std::collections::HashMap;
 
 use lambdaworks_math::field::{element::FieldElement as FE, traits::IsField};
 
-use super::{Column, Constraint, ConstraintSystem, Variable};
+use super::{errors::SolverError, Column, Constraint, ConstraintSystem, Variable};
 
-fn solve_constraint_hint<F: IsField>(
+/// Finds a solution to the system extending the `assignments` map.
+/// It returns an error in case there is no such solution.
+#[allow(unused)]
+impl<F> ConstraintSystem<F>
+where
+    F: IsField,
+{
+    pub fn solve(
+        &self,
+        mut assignments: HashMap<Variable, FE<F>>,
+    ) -> Result<(HashMap<Variable, FE<F>>), SolverError> {
+        let mut num_solved = 0;
+        loop {
+            let old_solved = num_solved;
+            for constraint in self.constraints.iter() {
+                (assignments, num_solved) = solve_hint(assignments, constraint, num_solved);
+                (assignments, num_solved) = solve_constraint(assignments, constraint, num_solved);
+            }
+            if num_solved == old_solved {
+                break;
+            }
+        }
+
+        // Check the system is solved
+        for constraint in self.constraints.iter() {
+            let a = assignments.get(&constraint.l);
+            let b = assignments.get(&constraint.r);
+            let c = assignments.get(&constraint.o);
+
+            match (a, b, c) {
+                (Some(a), Some(b), Some(c)) => {
+                    let ct = &constraint.constraint_type;
+                    let result = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + c * &ct.qo + &ct.qc;
+                    if result != FE::zero() {
+                        return Err(SolverError::InconsistentSystem);
+                    }
+                }
+                _ => return Err(SolverError::IndeterminateSystem),
+            }
+        }
+        Ok(assignments)
+    }
+}
+
+fn solve_hint<F: IsField>(
     mut assignments: HashMap<Variable, FE<F>>,
     constraint: &Constraint<F>,
     mut number_solved: usize,
 ) -> (HashMap<Variable, FE<F>>, usize) {
-    let a = assignments.get(&constraint.l);
-    let b = assignments.get(&constraint.r);
-    let c = assignments.get(&constraint.o);
-
+    let map = |column: &Column| match column {
+        Column::L => constraint.l,
+        Column::R => constraint.r,
+        Column::O => constraint.o,
+    };
     if let Some(hint) = &constraint.hint {
-        let function = hint.function;
-        match (&hint.input, &hint.output, a, b, c) {
-            (Column::L, Column::R, Some(a), None, _) => {
-                assignments.insert(constraint.r, function(a));
+        if !assignments.contains_key(&map(&hint.output)) {
+            if let Some(input) = assignments.get(&map(&hint.input)) {
+                assignments.insert(map(&hint.output), (hint.function)(input));
                 number_solved += 1;
             }
-            (Column::L, Column::O, Some(a), _, None) => {
-                assignments.insert(constraint.o, function(a));
-                number_solved += 1;
-            }
-            (Column::R, Column::L, None, Some(b), _) => {
-                assignments.insert(constraint.l, function(b));
-                number_solved += 1;
-            }
-            (Column::R, Column::O, _, Some(b), None) => {
-                assignments.insert(constraint.o, function(b));
-                number_solved += 1;
-            }
-            (Column::O, Column::L, None, _, Some(c)) => {
-                assignments.insert(constraint.l, function(c));
-                number_solved += 1;
-            }
-            (Column::O, Column::R, _, None, Some(c)) => {
-                assignments.insert(constraint.r, function(c));
-                number_solved += 1;
-            }
-            _ => {}
         }
     }
+
     (assignments, number_solved)
 }
 
@@ -61,7 +85,7 @@ fn solve_constraint<F: IsField>(
         (a, b, c),
         (ct.ql == zero, ct.qr == zero, ct.qm == zero, ct.qo == zero),
     ) {
-        ((Some(a), Some(b), Some(c)), _) => {
+        ((Some(_), Some(_), Some(_)), _) => {
             return (assignments, number_solved);
         }
         ((Some(a), Some(b), None), _) => {
@@ -142,50 +166,6 @@ fn solve_constraint<F: IsField>(
         }
     }
     (assignments, number_solved + 1)
-}
-/// Finds a solution to the system extending the `assignments` map.
-/// It returns an error in case there is no such solution.
-#[allow(unused)]
-impl<F> ConstraintSystem<F>
-where
-    F: IsField,
-{
-    pub fn solve(
-        &self,
-        mut assignments: HashMap<Variable, FE<F>>,
-    ) -> Result<(HashMap<Variable, FE<F>>), ()> {
-        let mut number_solved = 0;
-        loop {
-            let old_solved = number_solved;
-            for (i, constraint) in self.constraints.iter().enumerate() {
-                (assignments, number_solved) =
-                    solve_constraint_hint(assignments, constraint, number_solved);
-                (assignments, number_solved) =
-                    solve_constraint(assignments, constraint, number_solved);
-            }
-            if number_solved == old_solved {
-                break;
-            }
-        }
-
-        for constraint in self.constraints.iter() {
-            let a = assignments.get(&constraint.l);
-            let b = assignments.get(&constraint.r);
-            let c = assignments.get(&constraint.o);
-
-            match (a, b, c) {
-                (Some(a), Some(b), Some(c)) => {
-                    let ct = &constraint.constraint_type;
-                    let result = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + c * &ct.qo + &ct.qc;
-                    if result != FE::zero() {
-                        return Err(());
-                    }
-                }
-                _ => return Err(()),
-            }
-        }
-        Ok(assignments)
-    }
 }
 
 #[cfg(test)]

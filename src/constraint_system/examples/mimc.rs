@@ -21,7 +21,7 @@ pub fn mimc<F: IsField>(
         }
         // h = x + 2h + stream
         h = system.linear_combination(&x, FE::one(), &h, FE::from(2), FE::zero(), None);
-        h = system.add(&h, &item);
+        h = system.add(&h, item);
     }
     h
 }

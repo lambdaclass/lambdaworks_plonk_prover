@@ -12,7 +12,7 @@ pub fn pow<F: IsPrimeField>(
     let mut result = system.new_constant(FE::one());
 
     assert_eq!(exponent_bits.len(), 32);
-    for i in 0..32 {
+    for (i, item) in exponent_bits.iter().enumerate() {
         if i != 0 {
             result = system.mul(&result, &result);
         }
