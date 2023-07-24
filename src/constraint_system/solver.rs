@@ -56,111 +56,104 @@ where
                     }
                 }
 
-                let mut has_l = assignments.contains_key(&constraint.l);
-                let mut has_r = assignments.contains_key(&constraint.r);
-                let mut has_o = assignments.contains_key(&constraint.o);
-                // a Ql + b Qr + a b Qm + c Qo + Qc = 0
-                if has_l && has_r && has_o {
-                    continue;
-                } else if has_l && has_r && !has_o {
-                    let a = assignments.get(&constraint.l).unwrap();
-                    let b = assignments.get(&constraint.r).unwrap();
-                    if ct.qo != FE::zero() {
-                        let mut c = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + &ct.qc;
-                        c = -c * ct.qo.inv();
-                        assignments.insert(constraint.o, c);
-                    } else {
+                let a = assignments.get(&constraint.l);
+                let b = assignments.get(&constraint.r);
+                let c = assignments.get(&constraint.o);
+
+                match (a, b, c) {
+                    (Some(a), Some(b), Some(c)) => {
                         continue;
                     }
-                } else if has_l && !has_r && has_o {
-                    let a = assignments.get(&constraint.l).unwrap();
-                    let c = assignments.get(&constraint.o).unwrap();
-                    let denominator = &ct.qr + a * &ct.qm;
-                    if denominator != FE::zero() {
-                        let mut b = a * &ct.ql + c * &ct.qo + &ct.qc;
-                        b = -b * denominator.inv();
-                        assignments.insert(constraint.r, b);
-                    } else {
-                        continue;
+                    (Some(a), Some(b), None) => {
+                        if ct.qo != FE::zero() {
+                            let mut c = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + &ct.qc;
+                            c = -c * ct.qo.inv();
+                            assignments.insert(constraint.o, c);
+                        } else {
+                            continue;
+                        }
                     }
-                } else if !has_l && has_r && has_o {
-                    let b = assignments.get(&constraint.r).unwrap();
-                    let c = assignments.get(&constraint.o).unwrap();
-                    let denominator = &ct.ql + b * &ct.qm;
-                    if denominator != FE::zero() {
-                        let mut a = b * &ct.qr + c * &ct.qo + &ct.qc;
-                        a = -a * denominator.inv();
-                        assignments.insert(constraint.l, a);
-                    } else {
-                        continue;
+                    (Some(a), None, Some(c)) => {
+                        let denominator = &ct.qr + a * &ct.qm;
+                        if denominator != FE::zero() {
+                            let mut b = a * &ct.ql + c * &ct.qo + &ct.qc;
+                            b = -b * denominator.inv();
+                            assignments.insert(constraint.r, b);
+                        } else {
+                            continue;
+                        }
                     }
-                } else if has_l && !has_r && !has_o {
-                    let a = assignments.get(&constraint.l).unwrap();
-                    let b_coefficient = &ct.qr + a * &ct.qm;
-                    if b_coefficient == FE::zero() && ct.qo != FE::zero() {
-                        let c = -(a * &ct.ql + &ct.qc) * ct.qo.inv();
-                        assignments.insert(constraint.o, c);
-                    } else if b_coefficient != FE::zero() && ct.qo == FE::zero() {
-                        let b = -(a * &ct.ql + &ct.qc) * b_coefficient.inv();
-                        assignments.insert(constraint.r, b);
-                    } else {
-                        continue;
+                    (None, Some(b), Some(c)) => {
+                        let denominator = &ct.ql + b * &ct.qm;
+                        if denominator != FE::zero() {
+                            let mut a = b * &ct.qr + c * &ct.qo + &ct.qc;
+                            a = -a * denominator.inv();
+                            assignments.insert(constraint.l, a);
+                        } else {
+                            continue;
+                        }
                     }
-                } else if !has_l && has_r && !has_o {
-                    let b = assignments.get(&constraint.r).unwrap();
-                    let a_coefficient = &ct.ql + b * &ct.qm;
-                    if a_coefficient == FE::zero() && ct.qo != FE::zero() {
-                        let c = -(b * &ct.qr + &ct.qc) * ct.qo.inv();
-                        assignments.insert(constraint.o, c);
-                    } else if a_coefficient != FE::zero() && ct.qo == FE::zero() {
-                        let a = -(b * &ct.qr + &ct.qc) * a_coefficient.inv();
-                        assignments.insert(constraint.l, a);
-                    } else {
-                        continue;
+                    (Some(a), None, None) => {
+                        let b_coefficient = &ct.qr + a * &ct.qm;
+                        if b_coefficient == FE::zero() && ct.qo != FE::zero() {
+                            let c = -(a * &ct.ql + &ct.qc) * ct.qo.inv();
+                            assignments.insert(constraint.o, c);
+                        } else if b_coefficient != FE::zero() && ct.qo == FE::zero() {
+                            let b = -(a * &ct.ql + &ct.qc) * b_coefficient.inv();
+                            assignments.insert(constraint.r, b);
+                        } else {
+                            continue;
+                        }
                     }
-                } else if !has_l && !has_r && has_o && ct.qo != FE::zero() {
-                    let c = assignments.get(&constraint.o).unwrap();
-                    if ct.ql != FE::zero() && ct.qr == FE::zero() {
-                        let a = -(c * &ct.qo + &ct.qc) * ct.ql.inv();
-                        assignments.insert(constraint.l, a);
-                    } else if ct.ql == FE::zero() && ct.qr != FE::zero() {
-                        let b = -(c * &ct.qo + &ct.qc) * ct.qr.inv();
-                        assignments.insert(constraint.r, b);
-                    } else {
-                        continue;
+                    (None, Some(b), None) => {
+                        let a_coefficient = &ct.ql + b * &ct.qm;
+                        if a_coefficient == FE::zero() && ct.qo != FE::zero() {
+                            let c = -(b * &ct.qr + &ct.qc) * ct.qo.inv();
+                            assignments.insert(constraint.o, c);
+                        } else if a_coefficient != FE::zero() && ct.qo == FE::zero() {
+                            let a = -(b * &ct.qr + &ct.qc) * a_coefficient.inv();
+                            assignments.insert(constraint.l, a);
+                        } else {
+                            continue;
+                        }
                     }
-                } else if !has_l
-                    && !has_r
-                    && !has_o
-                    && ct.ql != FE::zero()
-                    && ct.qr == FE::zero()
-                    && ct.qm == FE::zero()
-                    && ct.qo == FE::zero()
-                {
-                    let a = -&ct.qc * ct.ql.inv();
-                    assignments.insert(constraint.l, a);
-                } else if !has_l
-                    && !has_r
-                    && !has_o
-                    && ct.ql == FE::zero()
-                    && ct.qr != FE::zero()
-                    && ct.qm == FE::zero()
-                    && ct.qo == FE::zero()
-                {
-                    let b = -&ct.qc * ct.qr.inv();
-                    assignments.insert(constraint.r, b);
-                } else if !has_l
-                    && !has_r
-                    && !has_o
-                    && ct.ql == FE::zero()
-                    && ct.qr == FE::zero()
-                    && ct.qm == FE::zero()
-                    && ct.qo != FE::zero()
-                {
-                    let c = -&ct.qc * ct.qo.inv();
-                    assignments.insert(constraint.o, c);
-                } else {
-                    continue;
+                    (None, None, Some(c)) => {
+                        if ct.qm != FE::zero() {
+                            continue;
+                        } else if ct.ql != FE::zero() && ct.qr == FE::zero() {
+                            let a = -(c * &ct.qo + &ct.qc) * ct.ql.inv();
+                            assignments.insert(constraint.l, a);
+                        } else if ct.ql == FE::zero() && ct.qr != FE::zero() {
+                            let b = -(c * &ct.qo + &ct.qc) * ct.qr.inv();
+                            assignments.insert(constraint.r, b);
+                        } else {
+                            continue;
+                        }
+                    }
+                    (None, None, None) => {
+                        match (
+                            ct.ql == FE::zero(),
+                            ct.qr == FE::zero(),
+                            ct.qm == FE::zero(),
+                            ct.qo == FE::zero(),
+                        ) {
+                            (true, true, true, false) => {
+                                let c = -&ct.qc * ct.qo.inv();
+                                assignments.insert(constraint.o, c);
+                            }
+                            (true, false, true, true) => {
+                                let b = -&ct.qc * ct.qr.inv();
+                                assignments.insert(constraint.r, b);
+                            }
+                            (false, true, true, true) => {
+                                let a = -&ct.qc * ct.ql.inv();
+                                assignments.insert(constraint.l, a);
+                            }
+                            _ => {
+                                continue;
+                            }
+                        }
+                    }
                 }
                 checked_constraints[i] = true;
                 number_solved += 1;
