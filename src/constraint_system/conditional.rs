@@ -7,6 +7,7 @@ impl<F> ConstraintSystem<F>
 where
     F: IsField,
 {
+    /// Adds a constraint to enforce that `v1` is equal to `v2`.
     pub fn assert_eq(&mut self, v1: &Variable, v2: &Variable) {
         self.add_constraint(Constraint {
             constraint_type: ConstraintType {
@@ -23,6 +24,8 @@ where
         });
     }
 
+    /// Creates a new variable `w` constrained to be `v1` in case 
+    /// `boolean_condition` is `1` and `v2` otherwise.
     pub fn if_else(
         &mut self,
         boolean_condition: &Variable,
@@ -35,6 +38,8 @@ where
         self.add(&if_branch, &else_branch)
     }
 
+    /// Creates a new variable `w` constrained to be `v1` in case 
+    /// `condition` is not zero and `v2` otherwise.
     pub fn if_nonzero_else(
         &mut self,
         condition: &Variable,
