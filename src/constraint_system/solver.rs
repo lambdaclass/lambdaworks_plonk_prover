@@ -5,7 +5,12 @@ use lambdaworks_math::field::{element::FieldElement as FE, traits::IsField};
 use super::{errors::SolverError, Column, Constraint, ConstraintSystem, Variable};
 
 /// Finds a solution to the system extending the `assignments` map.
-/// It returns an error in case there is no such solution.
+/// It uses the simple strategy of going through all the constraints trying
+/// to determine an unkwown value of a variable in terms of known values.
+/// It stops when it goes through every constraint and there's nothing else
+/// to be solved this way.
+/// It returns an error in case there is no such solution or in case this
+/// strategy is not enough.
 #[allow(unused)]
 impl<F> ConstraintSystem<F>
 where
