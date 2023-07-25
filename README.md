@@ -1,5 +1,5 @@
 # Lambdaworks Plonk Prover
-A fast implementation of the Plonk zk-protocol written in Rust. This is part of the [Lambdaworks](https://github.com/lambdaclass/lambdaworks) zero-knowledge framework. It comes with a high-level API to build your own circuits.
+A fast implementation of the [Plonk](https://eprint.iacr.org/2019/953) zk-protocol written in Rust. This is part of the [Lambdaworks](https://github.com/lambdaclass/lambdaworks) zero-knowledge framework. It includes a high-level API to seamlessly build your own circuits.
 
 <div>
 
@@ -11,7 +11,7 @@ A fast implementation of the Plonk zk-protocol written in Rust. This is part of 
 </div>
 
 ## Building a custom circuit
-The following code creates a circuit with two public inputs `x`, `y` and asserts `x*e=y`:
+The following code creates a circuit with two public inputs `x`, `y` and asserts `x * e = y`:
 
 ```rust
 let system = &mut ConstraintSystem::<FrField>::new();
@@ -25,7 +25,7 @@ system.assert_eq(&y, &z);;
 
 ## Generating a proof
 ### Setup
-A setup is needed in order to generate a proof for a new circuit. This generates a verifying key that will be used by both the prover and the verifier:
+A setup is needed in order to generate a proof for a new circuit. The following code generates a verifying key that will be used by both the prover and the verifier:
 
 ```rust
 let common = CommonPreprocessedInput::from_constraint_system(&system, &ORDER_R_MINUS_1_ROOT_UNITY);
@@ -56,3 +56,6 @@ Just call the verifier:
 let verifier = Verifier::new(kzg);
 assert!(verifier.verify(&proof, &public_inputs, &common, &verifying_key));
 ```
+
+# More info
+You can find more info in the [documentation](https://lambdaclass.github.io/lambdaworks_plonk_prover/).
