@@ -9,34 +9,12 @@ use std::collections::HashMap;
 
 use lambdaworks_math::field::{element::FieldElement, traits::IsField};
 
-// a Ql + b Qr + a b Qm + c Qo + Qc = 0
-#[derive(Clone)]
-struct ConstraintType<F: IsField> {
-    ql: FieldElement<F>,
-    qr: FieldElement<F>,
-    qm: FieldElement<F>,
-    qo: FieldElement<F>,
-    qc: FieldElement<F>,
-}
-
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub enum Column {
-    L,
-    R,
-    O,
-}
-
-#[allow(unused)]
-#[derive(Clone)]
-pub struct Hint<F: IsField> {
-    function: fn(&FieldElement<F>) -> FieldElement<F>,
-    input: Column,
-    output: Column,
-}
-
-#[allow(unused)]
-pub type Variable = usize;
-
+/// A constraint that enforces relations between variables.
+/// If `ConstraintType` represents (Q_L, Q_R, Q_M, Q_O, Q_C),
+/// then the constraint enforces that
+/// `a Q_L + b Q_R + a b Q_M + c Q_O + Q_C = 0`
+/// where `a`, `b`, and `c` are the values taken by the
+/// variables `l`, `r` and `o` respectively.
 #[allow(unused)]
 #[derive(Clone)]
 pub struct Constraint<F: IsField> {
@@ -47,6 +25,48 @@ pub struct Constraint<F: IsField> {
     o: Variable,
 }
 
+/// A `ConstraintType` represents a type of
+/// gate and is determined by the values of
+/// the coefficients Q_L, Q_R, Q_M, Q_O, Q_C
+#[derive(Clone)]
+struct ConstraintType<F: IsField> {
+    ql: FieldElement<F>,
+    qr: FieldElement<F>,
+    qm: FieldElement<F>,
+    qo: FieldElement<F>,
+    qc: FieldElement<F>,
+}
+
+/// A `Column` is either `L`, `R` or `O`
+/// It represents the role played by a variable
+/// in a constraint.
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub enum Column {
+    L,
+    R,
+    O,
+}
+
+/// A `Hint` is used to insert values to the
+/// solver.
+/// This is helpful when a constraint is hard to
+/// solve but easy to check.
+#[allow(unused)]
+#[derive(Clone)]
+pub struct Hint<F: IsField> {
+    function: fn(&FieldElement<F>) -> FieldElement<F>,
+    input: Column,
+    output: Column,
+}
+
+/// Represents a variable as an ID. 
+#[allow(unused)]
+pub type Variable = usize;
+
+
+/// A collection of variables and constraints that encodes
+/// correct executions of a program.
+/// Variables can be of two types: Public or private.
 #[allow(unused)]
 pub struct ConstraintSystem<F: IsField> {
     num_variables: usize,
@@ -59,6 +79,7 @@ impl<F> ConstraintSystem<F>
 where
     F: IsField,
 {
+    /// Returns a new empty constraint system.
     pub fn new() -> Self {
         Self {
             num_variables: 0,
@@ -67,26 +88,33 @@ where
         }
     }
 
+    /// Adds a constraint to the system.
     pub fn add_constraint(&mut self, constraint: Constraint<F>) {
         self.constraints.push(constraint);
     }
 
+    /// Returns a null variable to be used as a placeholder
+    /// in constraints.
     pub fn null_variable(&self) -> Variable {
         0
     }
 
+    /// Creates a new variable.
     pub fn new_variable(&mut self) -> Variable {
         let variable_id = self.num_variables;
         self.num_variables += 1;
         variable_id
     }
 
+    /// Creates a new public variable.
     pub fn new_public_input(&mut self) -> Variable {
         let new_variable = self.new_variable();
         self.public_input_variables.push(new_variable);
         new_variable
     }
-    pub fn padding_constraint(&self) -> Constraint<F> {
+
+    /// A dummy constraint meant to be used as padding.
+    fn padding_constraint(&self) -> Constraint<F> {
         let zero = FieldElement::zero();
         Constraint {
             constraint_type: ConstraintType {
@@ -103,6 +131,8 @@ where
         }
     }
 
+    /// Returns the public input header used in PLONK to
+    /// prove the usage of the public input values.
     fn public_input_header(&self) -> Vec<Constraint<F>> {
         let zero = FieldElement::zero();
         let minus_one = -FieldElement::one();
@@ -126,6 +156,21 @@ where
         public_input_constraints
     }
 
+    /// Returns the `LRO` and `Q` matrices.
+    /// Each matrix has one row per constraint.
+    /// The `LRO` matrix has 3 columns with the values of
+    /// the variables IDs of every constraint.
+    /// The `Q` matrix has 5 columns with the coefficients
+    /// of the constraint types.
+    /// Their layout is:
+    /// -----------------------
+    /// - public input header -
+    /// -----------------------
+    /// - circuit constraints -
+    /// -----------------------
+    /// -       padding       -
+    /// -----------------------
+    ///
     pub fn to_matrices(&self) -> (Vec<Variable>, Vec<FieldElement<F>>) {
         let header = self.public_input_header();
         let body = &self.constraints;
@@ -158,6 +203,8 @@ where
         (lro, q)
     }
 
+    /// This method filters the `values` hashmap to return
+    /// the list of values corresponding to the public variables
     fn public_input_values(
         &self,
         values: &HashMap<Variable, FieldElement<F>>,
@@ -178,6 +225,9 @@ impl<F: IsField> Default for ConstraintSystem<F> {
     }
 }
 
+/// This method takes the `LRO` matrix and computes
+/// the permutation used in PLONK to build the copy
+/// constraint polynomial.
 pub fn get_permutation(lro: &[Variable]) -> Vec<usize> {
     // For each variable store the indexes where it appears.
     let mut last_usage: HashMap<Variable, usize> = HashMap::new();

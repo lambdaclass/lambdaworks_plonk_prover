@@ -2,6 +2,7 @@ use lambdaworks_math::field::{element::FieldElement as FE, traits::IsField};
 
 use crate::constraint_system::{ConstraintSystem, Variable};
 
+/// The MIMC hash function.
 #[allow(unused)]
 pub fn mimc<F: IsField>(
     system: &mut ConstraintSystem<F>,

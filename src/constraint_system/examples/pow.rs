@@ -2,6 +2,7 @@ use lambdaworks_math::field::{element::FieldElement as FE, traits::IsPrimeField}
 
 use crate::constraint_system::{ConstraintSystem, Variable};
 
+/// A square and multiply implementation.
 #[allow(unused)]
 pub fn pow<F: IsPrimeField>(
     system: &mut ConstraintSystem<F>,
