@@ -59,10 +59,9 @@ pub struct Hint<F: IsField> {
     output: Column,
 }
 
-/// Represents a variable as an ID. 
+/// Represents a variable as an ID.
 #[allow(unused)]
 pub type Variable = usize;
-
 
 /// A collection of variables and constraints that encodes
 /// correct executions of a program.

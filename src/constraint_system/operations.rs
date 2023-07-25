@@ -115,7 +115,6 @@ where
         result
     }
 
-
     /// Creates two new variables `is_zero` and `v_inverse`.
     /// The former is constrained to be a boolean value
     /// holding `1` if `v` is zero and `0` otherwhse.

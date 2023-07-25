@@ -251,7 +251,10 @@ mod tests {
         };
         system.add_constraint(constraint);
         let inputs = HashMap::from([(b, FE::from(3)), (c, FE::from(12))]);
-        assert_eq!(system.solve(inputs).unwrap_err(), SolverError::UnableToSolve);
+        assert_eq!(
+            system.solve(inputs).unwrap_err(),
+            SolverError::UnableToSolve
+        );
     }
 
     #[test]
@@ -300,7 +303,10 @@ mod tests {
         };
         system.add_constraint(constraint);
         let inputs = HashMap::from([(a, FE::from(2)), (c, FE::from(12))]);
-        assert_eq!(system.solve(inputs).unwrap_err(), SolverError::UnableToSolve);
+        assert_eq!(
+            system.solve(inputs).unwrap_err(),
+            SolverError::UnableToSolve
+        );
     }
 
     #[test]
@@ -349,7 +355,10 @@ mod tests {
         };
         system.add_constraint(constraint);
         let inputs = HashMap::from([(a, FE::from(2)), (b, FE::from(3))]);
-        assert_eq!(system.solve(inputs).unwrap_err(), SolverError::UnableToSolve);
+        assert_eq!(
+            system.solve(inputs).unwrap_err(),
+            SolverError::UnableToSolve
+        );
     }
 
     #[test]
@@ -467,7 +476,10 @@ mod tests {
         system.add_constraint(constraint1);
         system.add_constraint(constraint2);
         let inputs = HashMap::from([(a, FE::from(1))]);
-        assert_eq!(system.solve(inputs).unwrap_err(), SolverError::UnableToSolve);
+        assert_eq!(
+            system.solve(inputs).unwrap_err(),
+            SolverError::UnableToSolve
+        );
     }
 
     #[test]
@@ -506,7 +518,10 @@ mod tests {
         system.add_constraint(constraint1);
         system.add_constraint(constraint2);
         let inputs = HashMap::from([(a, FE::from(1))]);
-        assert_eq!(system.solve(inputs).unwrap_err(), SolverError::UnableToSolve);
+        assert_eq!(
+            system.solve(inputs).unwrap_err(),
+            SolverError::UnableToSolve
+        );
     }
 
     #[test]
@@ -624,7 +639,10 @@ mod tests {
         system.add_constraint(constraint1);
         system.add_constraint(constraint2);
         let inputs = HashMap::from([(b, FE::from(1))]);
-        assert_eq!(system.solve(inputs).unwrap_err(), SolverError::UnableToSolve);
+        assert_eq!(
+            system.solve(inputs).unwrap_err(),
+            SolverError::UnableToSolve
+        );
     }
 
     #[test]
@@ -702,7 +720,10 @@ mod tests {
         system.add_constraint(constraint1);
         system.add_constraint(constraint2);
         let inputs = HashMap::from([(c, FE::from(2))]);
-        assert_eq!(system.solve(inputs).unwrap_err(), SolverError::UnableToSolve);
+        assert_eq!(
+            system.solve(inputs).unwrap_err(),
+            SolverError::UnableToSolve
+        );
     }
 
     #[test]
@@ -780,7 +801,10 @@ mod tests {
         system.add_constraint(constraint1);
         system.add_constraint(constraint2);
         let inputs = HashMap::from([(c, FE::from(2))]);
-        assert_eq!(system.solve(inputs).unwrap_err(), SolverError::UnableToSolve);
+        assert_eq!(
+            system.solve(inputs).unwrap_err(),
+            SolverError::UnableToSolve
+        );
     }
 
     #[test]
