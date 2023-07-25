@@ -141,7 +141,7 @@ where
         .try_into()
         .map_err(|_| DeserializationError::InvalidAmountOfBytes)?;
     let element_size = u32::from_be_bytes(element_size_bytes) as usize;
-    offset += size_of::<u32>() as usize;
+    offset += size_of::<u32>();
     let field_element = FieldElement::from_bytes_be(
         bytes
             .get(offset..offset + element_size)
