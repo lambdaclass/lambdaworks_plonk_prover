@@ -1,5 +1,5 @@
 # Lambdaworks Plonk Prover
-Fast implementation of the Plonk zk-protocol. This is part of the [Lambdaworks](https://github.com/lambdaclass/lambdaworks) zero-knowledge framework. It comes with a high-level API to build your own circuits.
+A fast implementation of the Plonk zk-protocol written in Rust. This is part of the [Lambdaworks](https://github.com/lambdaclass/lambdaworks) zero-knowledge framework. It comes with a high-level API to build your own circuits.
 
 <div>
 
