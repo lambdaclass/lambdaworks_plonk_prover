@@ -163,14 +163,13 @@ where
     /// The `Q` matrix has 5 columns with the coefficients
     /// of the constraint types.
     /// Their layout is:
-    /// -----------------------
-    /// - public input header -
-    /// -----------------------
-    /// - circuit constraints -
-    /// -----------------------
-    /// -       padding       -
-    /// -----------------------
-    ///
+    /// #######################
+    /// # public input header #
+    /// #######################
+    /// # circuit constraints #
+    /// #######################
+    /// #       padding       #
+    /// #######################
     pub fn to_matrices(&self) -> (Vec<Variable>, Vec<FieldElement<F>>) {
         let header = self.public_input_header();
         let body = &self.constraints;
