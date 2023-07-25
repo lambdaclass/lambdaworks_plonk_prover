@@ -1,18 +1,18 @@
 # Lambdaworks Plonk Prover
-Fast implementation of the Plonk zk protocol written in Rust. This is part of the [Lambdaworks](https://github.com/lambdaclass/lambdaworks) framework. It comes with a high-level API to build your own circuits.
+Fast implementation of the Plonk zk-protocol. This is part of the [Lambdaworks](https://github.com/lambdaclass/lambdaworks) zero-knowledge framework. It comes with a high-level API to build your own circuits.
 
 <div>
 
 [![Telegram Chat][tg-badge]][tg-url]
-[![codecov](https://img.shields.io/codecov/c/github/lambdaclass/lambdaworks)](https://codecov.io/gh/lambdaclass/lambdaworks)
 
 [tg-badge]: https://img.shields.io/static/v1?color=green&logo=telegram&label=chat&style=flat&message=join
 [tg-url]: https://t.me/+98Whlzql7Hs0MDZh
 
 </div>
+## Quickstart
 
-## Building a circuit
-The following code creates a circuit representing the program that has two public inputs `x` and `y` and asserts `x*e=y`:
+## Building a custom circuit
+The following code creates a circuit with two public inputs `x`, `y` and asserts `x*e=y`:
 
 ```rust
 let system = &mut ConstraintSystem::<FrField>::new();
@@ -24,29 +24,36 @@ let z = system.mul(&x, &e);
 system.assert_eq(&y, &z);;
 ```
 
-## Setup
-The setup generates a verifying key for a specific circuit:
+## Generating a proof
+### Setup
+A setup is needed in order to generate a proof for a new circuit. This generates a verifying key that will be used by both the prover and the verifier:
 
 ```rust
 let common = CommonPreprocessedInput::from_constraint_system(&system, &ORDER_R_MINUS_1_ROOT_UNITY);
 let srs = test_srs(common.n);
 let kzg = KZG::new(srs); // The commitment scheme for plonk.
-let vk = setup(&common, &kzg);
+let verifying_key = setup(&common, &kzg);
 ```
 
-## Generating a proof
+### Prover
+First, we fix the public inputs `x` and `y` and solve the constraint system:
 ```rust
 let inputs = HashMap::from([(x, FieldElement::from(4)), (e, FieldElement::from(3))]);
 let assignments = system.solve(inputs).unwrap();
-let witness = Witness::new(assignments, &system);
+```
 
+Finally, we call the prover:
+```rust
+let witness = Witness::new(assignments, &system);
 let public_inputs = system.public_input_values(&assignments);
 let prover = Prover::new(kzg.clone(), TestRandomFieldGenerator {});
-let proof = prover.prove(&witness, &public_inputs, &common, &vk);
+let proof = prover.prove(&witness, &public_inputs, &common, &verifying_key);
 ```
 
 ## Verifying a proof
+Just call the verifier:
+
 ```rust
 let verifier = Verifier::new(kzg);
-assert!(verifier.verify(&proof, &public_inputs, &common, &vk));
+assert!(verifier.verify(&proof, &public_inputs, &common, &verifying_key));
 ```
