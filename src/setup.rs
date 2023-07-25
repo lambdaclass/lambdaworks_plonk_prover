@@ -1,6 +1,12 @@
+use std::collections::HashMap;
+
+use crate::constraint_system::{get_permutation, ConstraintSystem, Variable};
+use crate::test_utils::utils::{generate_domain, generate_permutation_coefficients};
 use lambdaworks_crypto::commitments::traits::IsCommitmentScheme;
 use lambdaworks_crypto::fiat_shamir::default_transcript::DefaultTranscript;
 use lambdaworks_crypto::fiat_shamir::transcript::Transcript;
+use lambdaworks_math::fft::polynomial::FFTPoly;
+use lambdaworks_math::field::traits::IsFFTField;
 use lambdaworks_math::field::{element::FieldElement, traits::IsField};
 use lambdaworks_math::polynomial::Polynomial;
 use lambdaworks_math::traits::{ByteConversion, Serializable};
@@ -10,6 +16,20 @@ pub struct Witness<F: IsField> {
     pub a: Vec<FieldElement<F>>,
     pub b: Vec<FieldElement<F>>,
     pub c: Vec<FieldElement<F>>,
+}
+
+impl<F: IsField> Witness<F> {
+    pub fn new(values: HashMap<Variable, FieldElement<F>>, system: &ConstraintSystem<F>) -> Self {
+        let (lro, _) = system.to_matrices();
+        let abc: Vec<_> = lro.iter().map(|v| values[v].clone()).collect();
+        let n = lro.len() / 3;
+
+        Self {
+            a: abc[..n].to_vec(),
+            b: abc[n..2 * n].to_vec(),
+            c: abc[2 * n..].to_vec(),
+        }
+    }
 }
 
 // TODO: implement getters
@@ -34,6 +54,51 @@ pub struct CommonPreprocessedInput<F: IsField> {
     pub s1_lagrange: Vec<FieldElement<F>>,
     pub s2_lagrange: Vec<FieldElement<F>>,
     pub s3_lagrange: Vec<FieldElement<F>>,
+}
+
+impl<F: IsFFTField> CommonPreprocessedInput<F> {
+    pub fn from_constraint_system(
+        system: &ConstraintSystem<F>,
+        order_r_minus_1_root_unity: &FieldElement<F>,
+    ) -> Self {
+        let (lro, q) = system.to_matrices();
+        let n = lro.len() / 3;
+        let omega = F::get_primitive_root_of_unity(n.trailing_zeros() as u64).unwrap();
+        let domain = generate_domain(&omega, n);
+
+        let m = q.len() / 5;
+        let ql: Vec<_> = q[..m].to_vec();
+        let qr: Vec<_> = q[m..2 * m].to_vec();
+        let qm: Vec<_> = q[2 * m..3 * m].to_vec();
+        let qo: Vec<_> = q[3 * m..4 * m].to_vec();
+        let qc: Vec<_> = q[4 * m..].to_vec();
+
+        let permutation = get_permutation(&lro);
+        let permuted =
+            generate_permutation_coefficients(&omega, n, &permutation, order_r_minus_1_root_unity);
+
+        let s1_lagrange: Vec<_> = permuted[..n].to_vec();
+        let s2_lagrange: Vec<_> = permuted[n..2 * n].to_vec();
+        let s3_lagrange: Vec<_> = permuted[2 * n..].to_vec();
+
+        Self {
+            domain,
+            n,
+            omega,
+            k1: order_r_minus_1_root_unity.clone(),
+            ql: Polynomial::interpolate_fft(&ql).unwrap(), // TODO: Remove unwraps
+            qr: Polynomial::interpolate_fft(&qr).unwrap(),
+            qo: Polynomial::interpolate_fft(&qo).unwrap(),
+            qm: Polynomial::interpolate_fft(&qm).unwrap(),
+            qc: Polynomial::interpolate_fft(&qc).unwrap(),
+            s1: Polynomial::interpolate_fft(&s1_lagrange).unwrap(),
+            s2: Polynomial::interpolate_fft(&s2_lagrange).unwrap(),
+            s3: Polynomial::interpolate_fft(&s3_lagrange).unwrap(),
+            s1_lagrange,
+            s2_lagrange,
+            s3_lagrange,
+        }
+    }
 }
 
 #[allow(unused)]
