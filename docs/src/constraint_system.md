@@ -28,9 +28,9 @@ Before generating proofs for this system, we need to run a setup and obtain a ve
 
 ```rust
 let common = CommonPreprocessedInput::from_constraint_system(&system, &ORDER_R_MINUS_1_ROOT_UNITY);
-let srs = test_srs(common_preprocessed_input.n);
+let srs = test_srs(common.n);
 let kzg = KZG::new(srs); // The commitment scheme for plonk.
-let verifying_key = setup(&common_preprocessed_input, &kzg);
+let vk = setup(&common, &kzg);
 ```
 
 Now we can generate proofs for our system. We just need to specify the public inputs and obtain a witness that is a solution for our constraint system:
@@ -38,11 +38,23 @@ Now we can generate proofs for our system. We just need to specify the public in
 ```rust
 let inputs = HashMap::from([(x, FieldElement::from(4)), (e, FieldElement::from(3))]);
 let assignments = system.solve(inputs).unwrap();
-let public_inputs = system.public_input_values(&assignments);
 let witness = Witness::new(assignments, &system);
 ```
 
-Once you have all these ingredients, you can call the prover as specified in the README.
+Once you have all these ingredients, you can call the prover:
+
+```rust
+let public_inputs = system.public_input_values(&assignments);
+let prover = Prover::new(kzg.clone(), TestRandomFieldGenerator {});
+let proof = prover.prove(&witness, &public_inputs, &common, &vk);
+```
+
+and verify:
+
+```rust
+let verifier = Verifier::new(kzg);
+assert!(verifier.verify(&proof, &public_inputs, &common, &vk));
+```
 
 ## Building Complex Systems
 
