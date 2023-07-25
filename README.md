@@ -9,7 +9,6 @@ Fast implementation of the Plonk zk-protocol. This is part of the [Lambdaworks](
 [tg-url]: https://t.me/+98Whlzql7Hs0MDZh
 
 </div>
-## Quickstart
 
 ## Building a custom circuit
 The following code creates a circuit with two public inputs `x`, `y` and asserts `x*e=y`:
