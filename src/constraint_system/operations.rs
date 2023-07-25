@@ -7,7 +7,8 @@ impl<F> ConstraintSystem<F>
 where
     F: IsField,
 {
-    /// Generates a new variable `v = c1 * v1 + c2 * v2 + b`
+    /// Creates a new variable `w` constrained to be
+    /// equal to `c1 * v1 + c2 * v2 + b`.
     pub fn linear_combination(
         &mut self,
         v1: &Variable,
@@ -35,7 +36,8 @@ where
         result
     }
 
-    /// Generates a new variables `w = c * v + b`
+    /// Creates a new variable `w` constrained to be
+    /// equal to `c * v + b`.
     pub fn linear_function(
         &mut self,
         v: &Variable,
@@ -60,14 +62,20 @@ where
         result
     }
 
+    /// Creates a new variable `w` constrained to be equal
+    /// to `v1 + v2`.
     pub fn add(&mut self, v1: &Variable, v2: &Variable) -> Variable {
         self.linear_combination(v1, FE::one(), v2, FE::one(), FE::zero(), None)
     }
 
+    /// Creates a new variable `w` constrained to be equal
+    /// to `v1 + constant`.
     pub fn add_constant(&mut self, v: &Variable, constant: FE<F>) -> Variable {
         self.linear_function(v, FE::one(), constant, None)
     }
 
+    /// Creates a new variable `w` constrained to be equal
+    /// to `v1 * v2`.
     pub fn mul(&mut self, v1: &Variable, v2: &Variable) -> Variable {
         let result = self.new_variable();
         self.add_constraint(Constraint {
@@ -86,8 +94,10 @@ where
         result
     }
 
-    // TODO: check 0.div(0) does not compile
+    /// Creates a new variable `w` constrained to be equal
+    /// to `v1 / v2`.
     fn div(&mut self, v1: &Variable, v2: &Variable) -> Variable {
+        // TODO: check 0.div(0) does not compile
         let result = self.new_variable();
         self.add_constraint(Constraint {
             constraint_type: ConstraintType {
@@ -105,6 +115,12 @@ where
         result
     }
 
+
+    /// Creates two new variables `is_zero` and `v_inverse`.
+    /// The former is constrained to be a boolean value
+    /// holding `1` if `v` is zero and `0` otherwhse.
+    /// The latter is constrained to be `v^{-1}` when
+    /// `v` is not zero and equal to `0` otherwise.
     pub fn inv(&mut self, v: &Variable) -> (Variable, Variable) {
         let is_zero = self.new_variable();
         let v_inverse = self.new_variable();
@@ -160,6 +176,9 @@ where
         (is_zero, v_inverse)
     }
 
+    /// Returns a new variable `w` constrained to satisfy
+    /// `w = 1 - v`.
+    /// When `v` is boolean this is the `not` operator.
     pub fn not(&mut self, v: &Variable) -> Variable {
         let result = self.new_variable();
         self.add_constraint(Constraint {
