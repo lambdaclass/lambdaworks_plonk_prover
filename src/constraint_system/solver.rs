@@ -41,7 +41,7 @@ where
                         return Err(SolverError::InconsistentSystem);
                     }
                 }
-                _ => return Err(SolverError::IndeterminateSystem),
+                _ => return Err(SolverError::UnableToSolve),
             }
         }
         Ok(assignments)
@@ -177,7 +177,6 @@ mod tests {
     };
 
     #[test]
-    // All values are known
     fn test_case_all_values_are_known() {
         let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
         let a = system.new_variable();
@@ -202,7 +201,6 @@ mod tests {
     }
 
     #[test]
-    // `b` and `c` are known.
     fn test_case_b_and_c_are_known() {
         let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
         let a = system.new_variable();
@@ -228,7 +226,30 @@ mod tests {
     }
 
     #[test]
-    // `a` and `c` are known.
+    fn test_case_b_and_c_are_known_but_as_coefficient_is_zero() {
+        let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
+        let a = system.new_variable();
+        let b = system.new_variable();
+        let c = system.new_variable();
+        let constraint = Constraint {
+            constraint_type: ConstraintType {
+                ql: FE::from(3),
+                qr: FE::one(),
+                qm: -FE::one(),
+                qo: -FE::one(),
+                qc: FE::one(),
+            },
+            hint: None,
+            l: a,
+            r: b,
+            o: c,
+        };
+        system.add_constraint(constraint);
+        let inputs = HashMap::from([(b, FE::from(3)), (c, FE::from(12))]);
+        assert_eq!(system.solve(inputs).unwrap_err(), SolverError::UnableToSolve);
+    }
+
+    #[test]
     fn test_case_a_and_c_are_known() {
         let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
         let a = system.new_variable();
@@ -254,7 +275,30 @@ mod tests {
     }
 
     #[test]
-    // `a` and `b` are known.
+    fn test_case_a_and_c_are_known_but_bs_coefficient_is_zero() {
+        let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
+        let a = system.new_variable();
+        let b = system.new_variable();
+        let c = system.new_variable();
+        let constraint = Constraint {
+            constraint_type: ConstraintType {
+                ql: FE::one(),
+                qr: FE::from(2),
+                qm: -FE::one(),
+                qo: FE::one(),
+                qc: FE::one(),
+            },
+            hint: None,
+            l: a,
+            r: b,
+            o: c,
+        };
+        system.add_constraint(constraint);
+        let inputs = HashMap::from([(a, FE::from(2)), (c, FE::from(12))]);
+        assert_eq!(system.solve(inputs).unwrap_err(), SolverError::UnableToSolve);
+    }
+
+    #[test]
     fn test_case_a_and_b_are_known() {
         let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
         let a = system.new_variable();
@@ -280,8 +324,31 @@ mod tests {
     }
 
     #[test]
-    // Only `a` is known and coefficient of `b` is zero in one constraint.
-    fn test_case_only_a_is_known_but_bs_coeffient_is_zero() {
+    fn test_case_a_and_b_are_known_but_cs_coefficient_is_zero() {
+        let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
+        let a = system.new_variable();
+        let b = system.new_variable();
+        let c = system.new_variable();
+        let constraint = Constraint {
+            constraint_type: ConstraintType {
+                ql: FE::one(),
+                qr: FE::one(),
+                qm: FE::one(),
+                qo: FE::zero(),
+                qc: FE::one(),
+            },
+            hint: None,
+            l: a,
+            r: b,
+            o: c,
+        };
+        system.add_constraint(constraint);
+        let inputs = HashMap::from([(a, FE::from(2)), (b, FE::from(3))]);
+        assert_eq!(system.solve(inputs).unwrap_err(), SolverError::UnableToSolve);
+    }
+
+    #[test]
+    fn test_case_only_a_is_known_but_bs_coeffient_is_zero_and_cs_coefficient_is_nonzero() {
         let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
         let a = system.new_variable();
         let b = system.new_variable();
@@ -321,8 +388,7 @@ mod tests {
     }
 
     #[test]
-    // Only `a` is known and coefficient of `b` is not zero in one constraint.
-    fn test_case_only_a_is_known_but_cs_coeffient_is_zero() {
+    fn test_case_only_a_is_known_but_bs_coefficient_is_nonzero_and_cs_coeffient_is_zero() {
         let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
         let a = system.new_variable();
         let b = system.new_variable();
@@ -362,8 +428,84 @@ mod tests {
     }
 
     #[test]
-    // Only `b` is known and coefficient of `a` is zero in one constraint.
-    fn test_case_only_b_is_known_but_as_coeffient_is_zero() {
+    fn test_case_only_a_is_known_but_bs_cofficient_is_zero_and_cs_coeffient_is_zero() {
+        let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
+        let a = system.new_variable();
+        let b = system.new_variable();
+        let c = system.new_variable();
+        let constraint1 = Constraint {
+            constraint_type: ConstraintType {
+                ql: FE::one(),
+                qr: FE::one(),
+                qm: -FE::one(),
+                qo: FE::zero(),
+                qc: -FE::from(5),
+            },
+            hint: None,
+            l: a,
+            r: b,
+            o: c,
+        };
+        let constraint2 = Constraint {
+            constraint_type: ConstraintType {
+                ql: FE::one(),
+                qr: FE::one(),
+                qm: FE::zero(),
+                qo: FE::zero(),
+                qc: FE::zero(),
+            },
+            hint: None,
+            l: b,
+            r: c,
+            o: system.null_variable(),
+        };
+        system.add_constraint(constraint1);
+        system.add_constraint(constraint2);
+        let inputs = HashMap::from([(a, FE::from(1))]);
+        assert_eq!(system.solve(inputs).unwrap_err(), SolverError::UnableToSolve);
+    }
+
+    #[test]
+    // TODO: This system is actually solvable but not with our current solver logic
+    fn test_case_only_a_is_known_but_bs_cofficient_is_nonzero_and_cs_coeffient_is_nonzero() {
+        let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
+        let a = system.new_variable();
+        let b = system.new_variable();
+        let c = system.new_variable();
+        let constraint1 = Constraint {
+            constraint_type: ConstraintType {
+                ql: FE::one(),
+                qr: FE::one(),
+                qm: FE::one(),
+                qo: FE::one(),
+                qc: -FE::from(5),
+            },
+            hint: None,
+            l: a,
+            r: b,
+            o: c,
+        };
+        let constraint2 = Constraint {
+            constraint_type: ConstraintType {
+                ql: FE::one(),
+                qr: FE::one(),
+                qm: FE::zero(),
+                qo: FE::zero(),
+                qc: FE::zero(),
+            },
+            hint: None,
+            l: b,
+            r: c,
+            o: system.null_variable(),
+        };
+        system.add_constraint(constraint1);
+        system.add_constraint(constraint2);
+        let inputs = HashMap::from([(a, FE::from(1))]);
+        assert_eq!(system.solve(inputs).unwrap_err(), SolverError::UnableToSolve);
+    }
+
+    #[test]
+    fn test_case_only_b_is_known_but_as_coeffient_is_zero_and_cs_coefficient_is_nonzero() {
         let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
         let a = system.new_variable();
         let b = system.new_variable();
@@ -403,8 +545,7 @@ mod tests {
     }
 
     #[test]
-    // Only `b` is known and coefficient of `a` is not zero in one constraint.
-    fn test_case_only_b_is_known_but_cs_coeffient_is_zero() {
+    fn test_case_only_b_is_known_but_as_coefficient_is_nonzero_and_cs_coeffient_is_zero() {
         let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
         let a = system.new_variable();
         let b = system.new_variable();
@@ -444,8 +585,45 @@ mod tests {
     }
 
     #[test]
-    // Only `c` is known and coefficient of `b` is not zero in one constraint.
-    fn test_case_only_c_is_known_but_bs_coeffient_is_zero() {
+    fn test_case_only_b_is_known_but_as_coefficient_is_zero_and_cs_coeffient_is_zero() {
+        let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
+        let a = system.new_variable();
+        let b = system.new_variable();
+        let c = system.new_variable();
+        let constraint1 = Constraint {
+            constraint_type: ConstraintType {
+                ql: FE::one(),
+                qr: FE::one(),
+                qm: -FE::one(),
+                qo: FE::zero(),
+                qc: -FE::from(5),
+            },
+            hint: None,
+            l: a,
+            r: b,
+            o: system.null_variable(),
+        };
+        let constraint2 = Constraint {
+            constraint_type: ConstraintType {
+                ql: FE::one(),
+                qr: FE::one(),
+                qm: FE::zero(),
+                qo: FE::zero(),
+                qc: FE::zero(),
+            },
+            hint: None,
+            l: a,
+            r: c,
+            o: system.null_variable(),
+        };
+        system.add_constraint(constraint1);
+        system.add_constraint(constraint2);
+        let inputs = HashMap::from([(b, FE::from(1))]);
+        assert_eq!(system.solve(inputs).unwrap_err(), SolverError::UnableToSolve);
+    }
+
+    #[test]
+    fn test_case_only_c_is_known_but_bs_coeffient_is_zero_and_qm_is_zero() {
         let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
         let a = system.new_variable();
         let b = system.new_variable();
@@ -485,8 +663,45 @@ mod tests {
     }
 
     #[test]
-    // Only `c` is known and coefficient of `a` is not zero in one constraint.
-    fn test_case_only_c_is_known_but_as_coeffient_is_zero() {
+    fn test_case_only_c_is_known_and_bs_coeffient_is_zero_but_qm_is_nonzero() {
+        let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
+        let a = system.new_variable();
+        let b = system.new_variable();
+        let c = system.new_variable();
+        let constraint1 = Constraint {
+            constraint_type: ConstraintType {
+                ql: FE::from(2),
+                qr: FE::zero(),
+                qm: FE::one(),
+                qo: FE::one(),
+                qc: FE::zero(),
+            },
+            hint: None,
+            l: a,
+            r: b,
+            o: c,
+        };
+        let constraint2 = Constraint {
+            constraint_type: ConstraintType {
+                ql: FE::one(),
+                qr: FE::one(),
+                qm: FE::zero(),
+                qo: FE::zero(),
+                qc: FE::zero(),
+            },
+            hint: None,
+            l: a,
+            r: b,
+            o: system.null_variable(),
+        };
+        system.add_constraint(constraint1);
+        system.add_constraint(constraint2);
+        let inputs = HashMap::from([(c, FE::from(2))]);
+        assert_eq!(system.solve(inputs).unwrap_err(), SolverError::UnableToSolve);
+    }
+
+    #[test]
+    fn test_case_only_c_is_known_but_as_coeffient_is_zero_and_qm_is_zero() {
         let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
         let a = system.new_variable();
         let b = system.new_variable();
@@ -523,6 +738,44 @@ mod tests {
         let assignments = system.solve(inputs).unwrap();
         assert_eq!(assignments.get(&a).unwrap(), &FE::from(1));
         assert_eq!(assignments.get(&b).unwrap(), &-FE::from(1));
+    }
+
+    #[test]
+    fn test_case_only_c_is_known_but_as_coeffient_is_nonzero_and_qm_is_nonzero() {
+        let mut system = ConstraintSystem::<U64PrimeField<65537>>::new();
+        let a = system.new_variable();
+        let b = system.new_variable();
+        let c = system.new_variable();
+        let constraint1 = Constraint {
+            constraint_type: ConstraintType {
+                ql: FE::one(),
+                qr: FE::from(2),
+                qm: FE::one(),
+                qo: FE::one(),
+                qc: FE::zero(),
+            },
+            hint: None,
+            l: a,
+            r: b,
+            o: c,
+        };
+        let constraint2 = Constraint {
+            constraint_type: ConstraintType {
+                ql: FE::one(),
+                qr: FE::one(),
+                qm: FE::zero(),
+                qo: FE::zero(),
+                qc: FE::zero(),
+            },
+            hint: None,
+            l: a,
+            r: b,
+            o: system.null_variable(),
+        };
+        system.add_constraint(constraint1);
+        system.add_constraint(constraint2);
+        let inputs = HashMap::from([(c, FE::from(2))]);
+        assert_eq!(system.solve(inputs).unwrap_err(), SolverError::UnableToSolve);
     }
 
     #[test]
@@ -642,7 +895,7 @@ mod tests {
         system.add_constraint(constraint);
         assert_eq!(
             system.solve(inputs).unwrap_err(),
-            SolverError::IndeterminateSystem
+            SolverError::UnableToSolve
         );
     }
 }
