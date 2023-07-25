@@ -3,7 +3,7 @@ In this section, we'll discuss how to build your own constraint system to prove 
 
 ## Simple Example
 
-Let's take the following simple program as an example. We have two public inputs: `x` and `y`. We want to prove to a verifier that we know a private input `e` such that `xe = y`. You can achieve this by building the following constraint system:
+Let's take the following simple program as an example. We have two public inputs: `x` and `y`. We want to prove to a verifier that we know a private input `e` such that `x * e = y`. You can achieve this by building the following constraint system:
 
 ```rust
 use lambdaworks_plonk::constraint_system::ConstraintSystem;
@@ -24,7 +24,7 @@ fn main() {
 
 This code creates a constraint system over the field of the BLS12381 curve. Then, it creates three variables: two public inputs `x` and `y`, and a private variable `e`. Note that every variable is private except for the public inputs. Finally, it adds the constraints that represent a multiplication and an assertion.
 
-Before generating proofs for this system, we need to run a setup and obtain a verifying key.
+Before generating proofs for this system, we need to run a setup and obtain a verifying key:
 
 ```rust
 let common = CommonPreprocessedInput::from_constraint_system(&system, &ORDER_R_MINUS_1_ROOT_UNITY);
@@ -82,7 +82,7 @@ pub fn pow(
 }
 ```
 
-This function can then be used to modify our simple program from the previous section:
+This function can then be used to modify our simple program from the previous section. The following circuit checks that the prover knows `e` such that `pow(x, e) = y`:
 
 ```rust
 use lambdaworks_plonk::constraint_system::ConstraintSystem;
