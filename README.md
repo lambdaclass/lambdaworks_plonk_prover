@@ -10,6 +10,8 @@ A fast implementation of the [Plonk](https://eprint.iacr.org/2019/953) zk-protoc
 
 </div>
 
+This prover is still in development and may contain bugs. It is not intended to be used in production yet.
+
 ## Building a circuit
 The following code creates a circuit with two public inputs `x`, `y` and asserts `x * e = y`:
 
