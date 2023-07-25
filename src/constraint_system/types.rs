@@ -10,6 +10,7 @@ impl<F> ConstraintSystem<F>
 where
     F: IsField,
 {
+    /// Returns a new variable `w` constrained to take the value `value`.
     pub fn new_constant(&mut self, value: FE<F>) -> Variable {
         let constant = self.new_variable();
         self.add_constraint(Constraint {
@@ -28,6 +29,8 @@ where
         constant
     }
 
+    /// Returns a new variable `w` constrained to take either `0` or `1`
+    /// values.
     pub fn new_boolean(&mut self) -> Variable {
         let boolean = self.new_variable();
         self.add_constraint(Constraint {
@@ -46,6 +49,10 @@ where
         boolean
     }
 
+    /// Returns 32 new variables `[b31, b30,..., b1, b0]` constrained to take either
+    /// `0` or `1` values and to represent the binary decomposition
+    /// of the representative of the value of `v`:
+    /// `v = b0 + b1 * 2 + b2 * 2^2 + ... + b31 * 2^31`.
     pub fn new_u32(&mut self, v: &Variable) -> Vec<Variable>
     where
         F: IsPrimeField,
