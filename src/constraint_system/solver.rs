@@ -87,8 +87,7 @@ fn solve_constraint<F: IsField>(
     ) {
         ((Some(a), Some(b), None), _) => {
             if ct.qo != FE::zero() {
-                let mut c = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + &ct.qc;
-                c = -c * ct.qo.inv();
+                let c = -(a * &ct.ql + b * &ct.qr + a * b * &ct.qm + &ct.qc) * ct.qo.inv();
                 assignments.insert(constraint.o, c);
             }
         }
