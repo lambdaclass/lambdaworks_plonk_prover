@@ -95,16 +95,14 @@ fn solve_constraint<F: IsField>(
         ((Some(a), None, Some(c)), _) => {
             let denominator = &ct.qr + a * &ct.qm;
             if denominator != FE::zero() {
-                let mut b = a * &ct.ql + c * &ct.qo + &ct.qc;
-                b = -b * denominator.inv();
+                let b = -(a * &ct.ql + c * &ct.qo + &ct.qc) * denominator.inv();
                 assignments.insert(constraint.r, b);
             }
         }
         ((None, Some(b), Some(c)), _) => {
             let denominator = &ct.ql + b * &ct.qm;
             if denominator != FE::zero() {
-                let mut a = b * &ct.qr + c * &ct.qo + &ct.qc;
-                a = -a * denominator.inv();
+                let a = -(b * &ct.qr + c * &ct.qo + &ct.qc) * denominator.inv();
                 assignments.insert(constraint.l, a);
             }
         }
