@@ -7,11 +7,9 @@ impl<F> ConstraintSystem<F>
 where
     F: IsField,
 {
-    /// Creates a new variable `w` constrained to be equal to
-    /// `c1 * v1 + c2 * v2 + b`.
-    /// Optionally a hint can be provided to insert values in
-    /// `v1`, `v2` or `w`. To do so use the `L`, `R`, and `O`
-    ///  input/output columns of the hint to refer to `v1`,
+    /// Creates a new variable `w` constrained to be equal to `c1 * v1 + c2 * v2 + b`.
+    /// Optionally a hint can be provided to insert values in `v1`, `v2` or `w`. To do
+    /// so use the `L`, `R`, and `O` input/output columns of the hint to refer to `v1`,
     /// `v2` and `w` respectively.
     pub fn linear_combination(
         &mut self,
@@ -40,11 +38,9 @@ where
         result
     }
 
-    /// Creates a new variable `w` constrained to be
-    /// equal to `c * v + b`.
-    /// Optionally a hint can be provided to insert values in
-    /// `v1`, `v2` or `w`. To do so use the `L`, `R`, and `O`
-    ///  input/output columns of the hint to refer to `v1`,
+    /// Creates a new variable `w` constrained to be equal to `c * v + b`.
+    /// Optionally a hint can be provided to insert values in `v1`, `v2` or `w`. To do
+    /// so use the `L`, `R`, and `O` input/output columns of the hint to refer to `v1`,
     /// `v2` and `w` respectively.
     pub fn linear_function(
         &mut self,
@@ -70,20 +66,17 @@ where
         result
     }
 
-    /// Creates a new variable `w` constrained to be equal
-    /// to `v1 + v2`.
+    /// Creates a new variable `w` constrained to be equal to `v1 + v2`.
     pub fn add(&mut self, v1: &Variable, v2: &Variable) -> Variable {
         self.linear_combination(v1, FE::one(), v2, FE::one(), FE::zero(), None)
     }
 
-    /// Creates a new variable `w` constrained to be equal
-    /// to `v1 + constant`.
+    /// Creates a new variable `w` constrained to be equal to `v1 + constant`.
     pub fn add_constant(&mut self, v: &Variable, constant: FE<F>) -> Variable {
         self.linear_function(v, FE::one(), constant, None)
     }
 
-    /// Creates a new variable `w` constrained to be equal
-    /// to `v1 * v2`.
+    /// Creates a new variable `w` constrained to be equal to `v1 * v2`.
     pub fn mul(&mut self, v1: &Variable, v2: &Variable) -> Variable {
         let result = self.new_variable();
         self.add_constraint(Constraint {
@@ -102,8 +95,7 @@ where
         result
     }
 
-    /// Creates a new variable `w` constrained to be equal
-    /// to `v1 / v2`.
+    /// Creates a new variable `w` constrained to be equal to `v1 / v2`.
     fn div(&mut self, v1: &Variable, v2: &Variable) -> Variable {
         // TODO: check 0.div(0) does not compile
         let result = self.new_variable();
@@ -123,11 +115,9 @@ where
         result
     }
 
-    /// Creates two new variables `is_zero` and `v_inverse`.
-    /// The former is constrained to be a boolean value
-    /// holding `1` if `v` is zero and `0` otherwhse.
-    /// The latter is constrained to be `v^{-1}` when
-    /// `v` is not zero and equal to `0` otherwise.
+    /// Creates two new variables `is_zero` and `v_inverse`. The former is constrained
+    /// to be a boolean value holding `1` if `v` is zero and `0` otherwise. The latter
+    /// is constrained to be `v^{-1}` when `v` is not zero and equal to `0` otherwise.
     pub fn inv(&mut self, v: &Variable) -> (Variable, Variable) {
         let is_zero = self.new_variable();
         let v_inverse = self.new_variable();
@@ -183,9 +173,8 @@ where
         (is_zero, v_inverse)
     }
 
-    /// Returns a new variable `w` constrained to satisfy
-    /// `w = 1 - v`.
-    /// When `v` is boolean this is the `not` operator.
+    /// Returns a new variable `w` constrained to satisfy `w = 1 - v`. When `v` is boolean
+    /// this is the `not` operator.
     pub fn not(&mut self, v: &Variable) -> Variable {
         let result = self.new_variable();
         self.add_constraint(Constraint {
