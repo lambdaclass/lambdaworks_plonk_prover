@@ -4,13 +4,12 @@ use lambdaworks_math::field::{element::FieldElement as FE, traits::IsField};
 
 use super::{errors::SolverError, Column, Constraint, ConstraintSystem, Variable};
 
-/// Finds a solution to the system extending the `assignments` map.
-/// It uses the simple strategy of going through all the constraints trying
-/// to determine an unkwown value of a variable in terms of known values.
-/// It stops when it goes through every constraint and there's nothing else
-/// to be solved this way.
-/// It returns an error in case there is no such solution or in case this
-/// strategy is not enough.
+/// Finds a solution to the system extending the `assignments` map. It uses the
+/// simple strategy of going through all the constraints trying to determine an
+/// unkwown value of a variable in terms of known values. It stops when it goes
+/// through every constraint and there's nothing else to be solved this way.
+/// It returns an error in case there is no such solution or in case this strategy
+/// is not enough.
 #[allow(unused)]
 impl<F> ConstraintSystem<F>
 where
@@ -20,14 +19,13 @@ where
         &self,
         mut assignments: HashMap<Variable, FE<F>>,
     ) -> Result<(HashMap<Variable, FE<F>>), SolverError> {
-        let mut num_solved = 0;
         loop {
-            let old_solved = num_solved;
+            let old_solved = assignments.keys().len();
             for constraint in self.constraints.iter() {
-                (assignments, num_solved) = solve_hint(assignments, constraint, num_solved);
-                (assignments, num_solved) = solve_constraint(assignments, constraint, num_solved);
+                assignments = solve_hint(assignments, constraint);
+                assignments = solve_constraint(assignments, constraint);
             }
-            if num_solved == old_solved {
+            if old_solved == assignments.keys().len() {
                 break;
             }
         }
@@ -56,8 +54,7 @@ where
 fn solve_hint<F: IsField>(
     mut assignments: HashMap<Variable, FE<F>>,
     constraint: &Constraint<F>,
-    mut number_solved: usize,
-) -> (HashMap<Variable, FE<F>>, usize) {
+) -> HashMap<Variable, FE<F>> {
     let column_to_variable = |column: &Column| match column {
         Column::L => constraint.l,
         Column::R => constraint.r,
@@ -67,19 +64,17 @@ fn solve_hint<F: IsField>(
         if !assignments.contains_key(&column_to_variable(&hint.output)) {
             if let Some(input) = assignments.get(&column_to_variable(&hint.input)) {
                 assignments.insert(column_to_variable(&hint.output), (hint.function)(input));
-                number_solved += 1;
             }
         }
     }
 
-    (assignments, number_solved)
+    assignments
 }
 
 fn solve_constraint<F: IsField>(
     mut assignments: HashMap<Variable, FE<F>>,
     constraint: &Constraint<F>,
-    number_solved: usize,
-) -> (HashMap<Variable, FE<F>>, usize) {
+) -> HashMap<Variable, FE<F>> {
     let ct = &constraint.constraint_type;
     let a = assignments.get(&constraint.l);
     let b = assignments.get(&constraint.r);
@@ -95,8 +90,6 @@ fn solve_constraint<F: IsField>(
                 let mut c = a * &ct.ql + b * &ct.qr + a * b * &ct.qm + &ct.qc;
                 c = -c * ct.qo.inv();
                 assignments.insert(constraint.o, c);
-            } else {
-                return (assignments, number_solved);
             }
         }
         ((Some(a), None, Some(c)), _) => {
@@ -105,8 +98,6 @@ fn solve_constraint<F: IsField>(
                 let mut b = a * &ct.ql + c * &ct.qo + &ct.qc;
                 b = -b * denominator.inv();
                 assignments.insert(constraint.r, b);
-            } else {
-                return (assignments, number_solved);
             }
         }
         ((None, Some(b), Some(c)), _) => {
@@ -115,8 +106,6 @@ fn solve_constraint<F: IsField>(
                 let mut a = b * &ct.qr + c * &ct.qo + &ct.qc;
                 a = -a * denominator.inv();
                 assignments.insert(constraint.l, a);
-            } else {
-                return (assignments, number_solved);
             }
         }
         ((Some(a), None, None), _) => {
@@ -127,8 +116,6 @@ fn solve_constraint<F: IsField>(
             } else if b_coefficient != FE::zero() && ct.qo == FE::zero() {
                 let b = -(a * &ct.ql + &ct.qc) * b_coefficient.inv();
                 assignments.insert(constraint.r, b);
-            } else {
-                return (assignments, number_solved);
             }
         }
         ((None, Some(b), None), _) => {
@@ -139,8 +126,6 @@ fn solve_constraint<F: IsField>(
             } else if a_coefficient != FE::zero() && ct.qo == FE::zero() {
                 let a = -(b * &ct.qr + &ct.qc) * a_coefficient.inv();
                 assignments.insert(constraint.l, a);
-            } else {
-                return (assignments, number_solved);
             }
         }
         ((None, None, Some(c)), (false, true, true, _)) => {
@@ -163,11 +148,9 @@ fn solve_constraint<F: IsField>(
             let a = -&ct.qc * ct.ql.inv();
             assignments.insert(constraint.l, a);
         }
-        _ => {
-            return (assignments, number_solved);
-        }
+        _ => {}
     }
-    (assignments, number_solved + 1)
+    assignments
 }
 
 #[cfg(test)]
