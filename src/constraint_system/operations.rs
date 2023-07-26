@@ -7,8 +7,12 @@ impl<F> ConstraintSystem<F>
 where
     F: IsField,
 {
-    /// Creates a new variable `w` constrained to be
-    /// equal to `c1 * v1 + c2 * v2 + b`.
+    /// Creates a new variable `w` constrained to be equal to
+    /// `c1 * v1 + c2 * v2 + b`.
+    /// Optionally a hint can be provided to insert values in
+    /// `v1`, `v2` or `w`. To do so use the `L`, `R`, and `O`
+    ///  input/output columns of the hint to refer to `v1`,
+    /// `v2` and `w` respectively.
     pub fn linear_combination(
         &mut self,
         v1: &Variable,
@@ -38,6 +42,10 @@ where
 
     /// Creates a new variable `w` constrained to be
     /// equal to `c * v + b`.
+    /// Optionally a hint can be provided to insert values in
+    /// `v1`, `v2` or `w`. To do so use the `L`, `R`, and `O`
+    ///  input/output columns of the hint to refer to `v1`,
+    /// `v2` and `w` respectively.
     pub fn linear_function(
         &mut self,
         v: &Variable,
