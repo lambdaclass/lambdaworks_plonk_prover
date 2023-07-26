@@ -173,7 +173,7 @@ where
         let n = full_constraints.len();
 
         let mut lro = vec![self.null_variable(); n * 3];
-        // Make a single vector with | a_1 .. a_m | b_1 .. b_m | c_1 .. c_m | concatenated.
+        // Make a single vector with | l_1 .. l_m | r_1 .. r_m | o_1 .. o_m | concatenated.
         for (index, constraint) in full_constraints.iter().enumerate() {
             lro[index] = constraint.l;
             lro[index + n] = constraint.r;
