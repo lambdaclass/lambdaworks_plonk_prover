@@ -37,7 +37,7 @@ let verifying_key = setup(&common, &kzg);
 ```
 
 ### Prover
-First, we fix the public inputs `x` and `y` and solve the constraint system:
+First, we fix values for `x` and `e` and solve the constraint system:
 ```rust
 let inputs = HashMap::from([(x, FieldElement::from(4)), (e, FieldElement::from(3))]);
 let assignments = system.solve(inputs).unwrap();
