@@ -20,7 +20,7 @@ pub fn mimc<F: IsField>(
             let x_pow_4 = system.mul(&x_pow_2, &x_pow_2);
             x = system.mul(&x_pow_4, &x);
         }
-        // h = x + 2h + stream
+        // h = x + 2h + item
         h = system.linear_combination(&x, FE::one(), &h, FE::from(2), FE::zero(), None);
         h = system.add(&h, item);
     }
