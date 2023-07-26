@@ -14,3 +14,4 @@ Cargo.lock
 flamegraph.svg
 
 **/.DS_Store
+docs/book
