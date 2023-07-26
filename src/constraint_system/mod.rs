@@ -9,12 +9,10 @@ use std::collections::HashMap;
 
 use lambdaworks_math::field::{element::FieldElement, traits::IsField};
 
-/// A constraint that enforces relations between variables.
-/// If `ConstraintType` represents (Q_L, Q_R, Q_M, Q_O, Q_C),
-/// then the constraint enforces that
-/// `a Q_L + b Q_R + a b Q_M + c Q_O + Q_C = 0`
-/// where `a`, `b`, and `c` are the values taken by the
-/// variables `l`, `r` and `o` respectively.
+/// A constraint that enforces relations between variables. If `ConstraintType`
+/// represents (Q_L, Q_R, Q_M, Q_O, Q_C), then the constraint enforces that
+/// `a Q_L + b Q_R + a b Q_M + c Q_O + Q_C = 0` where `a`, `b`, and `c` are the
+/// values taken by the variables `l`, `r` and `o` respectively.
 #[allow(unused)]
 #[derive(Clone)]
 pub struct Constraint<F: IsField> {
@@ -25,9 +23,8 @@ pub struct Constraint<F: IsField> {
     o: Variable,
 }
 
-/// A `ConstraintType` represents a type of
-/// gate and is determined by the values of
-/// the coefficients Q_L, Q_R, Q_M, Q_O, Q_C
+/// A `ConstraintType` represents a type of gate and is determined by the values
+/// of the coefficients Q_L, Q_R, Q_M, Q_O, Q_C
 #[derive(Clone)]
 struct ConstraintType<F: IsField> {
     ql: FieldElement<F>,
@@ -37,9 +34,8 @@ struct ConstraintType<F: IsField> {
     qc: FieldElement<F>,
 }
 
-/// A `Column` is either `L`, `R` or `O`
-/// It represents the role played by a variable
-/// in a constraint.
+/// A `Column` is either `L`, `R` or `O`. It represents the role played by a
+/// variable in a constraint.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Column {
     L,
@@ -47,10 +43,8 @@ pub enum Column {
     O,
 }
 
-/// A `Hint` is used to insert values to the
-/// solver.
-/// This is helpful when a constraint is hard to
-/// solve but easy to check.
+/// A `Hint` is used to insert values to the solver. This is helpful when a
+/// constraint is hard to solve but easy to check.
 #[allow(unused)]
 #[derive(Clone)]
 pub struct Hint<F: IsField> {
@@ -63,9 +57,8 @@ pub struct Hint<F: IsField> {
 #[allow(unused)]
 pub type Variable = usize;
 
-/// A collection of variables and constraints that encodes
-/// correct executions of a program.
-/// Variables can be of two types: Public or private.
+/// A collection of variables and constraints that encodes correct executions
+/// of a program. Variables can be of two types: Public or private.
 #[allow(unused)]
 pub struct ConstraintSystem<F: IsField> {
     num_variables: usize,
@@ -130,8 +123,8 @@ where
         }
     }
 
-    /// Returns the public input header used in PLONK to
-    /// prove the usage of the public input values.
+    /// Returns the public input header used in PLONK to prove the usage of the
+    /// public input values.
     fn public_input_header(&self) -> Vec<Constraint<F>> {
         let zero = FieldElement::zero();
         let minus_one = -FieldElement::one();
@@ -155,12 +148,10 @@ where
         public_input_constraints
     }
 
-    /// Returns the `LRO` and `Q` matrices.
-    /// Each matrix has one row per constraint.
-    /// The `LRO` matrix has 3 columns with the values of
-    /// the variables IDs of every constraint.
-    /// The `Q` matrix has 5 columns with the coefficients
-    /// of the constraint types.
+    /// Returns the `LRO` and `Q` matrices. Each matrix has one row per constraint.
+    /// The `LRO` matrix has 3 columns with the values of the variables IDs of every
+    /// constraint. The `Q` matrix has 5 columns with the coefficients of the
+    /// constraint types.
     /// Their layout is:
     /// #######################
     /// # public input header #
@@ -201,8 +192,8 @@ where
         (lro, q)
     }
 
-    /// This method filters the `values` hashmap to return
-    /// the list of values corresponding to the public variables
+    /// This method filters the `values` hashmap to return the list of values
+    /// corresponding to the public variables
     fn public_input_values(
         &self,
         values: &HashMap<Variable, FieldElement<F>>,
@@ -223,9 +214,8 @@ impl<F: IsField> Default for ConstraintSystem<F> {
     }
 }
 
-/// This method takes the `LRO` matrix and computes
-/// the permutation used in PLONK to build the copy
-/// constraint polynomial.
+/// This method takes the `LRO` matrix and computes the permutation used in PLONK to
+/// build the copy constraint polynomial.
 pub fn get_permutation(lro: &[Variable]) -> Vec<usize> {
     // For each variable store the indexes where it appears.
     let mut last_usage: HashMap<Variable, usize> = HashMap::new();
