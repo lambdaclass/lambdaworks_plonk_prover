@@ -3,7 +3,6 @@ use lambdaworks_math::field::{element::FieldElement as FE, traits::IsPrimeField}
 use crate::constraint_system::{ConstraintSystem, Variable};
 
 /// A square and multiply implementation.
-#[allow(unused)]
 pub fn pow<F: IsPrimeField>(
     system: &mut ConstraintSystem<F>,
     base: Variable,
@@ -13,12 +12,12 @@ pub fn pow<F: IsPrimeField>(
     let mut result = system.new_constant(FE::one());
 
     assert_eq!(exponent_bits.len(), 32);
-    for (i, item) in exponent_bits.iter().enumerate() {
+    for (i, bit) in exponent_bits.iter().enumerate() {
         if i != 0 {
             result = system.mul(&result, &result);
         }
         let result_times_base = system.mul(&result, &base);
-        result = system.if_else(&exponent_bits[i], &result_times_base, &result);
+        result = system.if_else(bit, &result_times_base, &result);
     }
     result
 }

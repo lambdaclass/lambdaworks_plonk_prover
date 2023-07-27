@@ -2,7 +2,6 @@ use lambdaworks_math::field::{element::FieldElement as FE, traits::IsField};
 
 use super::{Column, Constraint, ConstraintSystem, ConstraintType, Hint, Variable};
 
-#[allow(unused)]
 impl<F> ConstraintSystem<F>
 where
     F: IsField,
@@ -96,7 +95,7 @@ where
     }
 
     /// Creates a new variable `w` constrained to be equal to `v1 / v2`.
-    fn div(&mut self, v1: &Variable, v2: &Variable) -> Variable {
+    pub fn div(&mut self, v1: &Variable, v2: &Variable) -> Variable {
         // TODO: check 0.div(0) does not compile
         let result = self.new_variable();
         self.add_constraint(Constraint {

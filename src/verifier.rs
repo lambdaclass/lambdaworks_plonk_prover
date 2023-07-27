@@ -15,7 +15,6 @@ pub struct Verifier<F: IsField, CS: IsCommitmentScheme<F>> {
 }
 
 impl<F: IsField + IsFFTField, CS: IsCommitmentScheme<F>> Verifier<F, CS> {
-    #[allow(unused)]
     pub fn new(commitment_scheme: CS) -> Self {
         Self {
             commitment_scheme,
@@ -62,7 +61,6 @@ impl<F: IsField + IsFFTField, CS: IsCommitmentScheme<F>> Verifier<F, CS> {
         [beta, gamma, alpha, zeta, upsilon]
     }
 
-    #[allow(unused)]
     pub fn verify(
         &self,
         p: &Proof<F, CS>,
