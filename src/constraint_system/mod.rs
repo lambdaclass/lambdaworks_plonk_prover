@@ -5,7 +5,7 @@ pub mod operations;
 pub mod solver;
 pub mod types;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, marker::PhantomData};
 
 use lambdaworks_math::field::{element::FieldElement, traits::IsField};
 
@@ -43,6 +43,33 @@ pub enum Column {
     O,
 }
 
+#[derive(Clone)]
+pub struct LookUp {
+    l: Variable,
+    r: Variable,
+    o: Variable,
+}
+
+struct LookUpTable<F: IsField> {
+    phantom: PhantomData<F>
+}
+
+impl<F: IsField> LookUpTable<F> {
+    fn look_up(a: &FieldElement<F>, b: &FieldElement<F>) -> FieldElement<F> {
+        let zero = &FieldElement::<F>::zero();
+        let one = &FieldElement::<F>::one();
+        if a == one && b == one {
+            FieldElement::zero()
+        } else if a == zero && b == one {
+            FieldElement::one()
+        } else if a == one && b == zero {
+            FieldElement::one()
+        } else {
+            FieldElement::zero()
+        }
+    }
+}
+
 /// A `Hint` is used to insert values to the solver. This is helpful when a
 /// constraint is hard to solve but easy to check.
 #[allow(unused)]
@@ -64,6 +91,7 @@ pub struct ConstraintSystem<F: IsField> {
     num_variables: usize,
     public_input_variables: Vec<Variable>,
     constraints: Vec<Constraint<F>>,
+    lookups: Vec<LookUp>
 }
 
 #[allow(unused)]
@@ -77,12 +105,18 @@ where
             num_variables: 0,
             public_input_variables: Vec::new(),
             constraints: Vec::new(),
+            lookups: Vec::new()
         }
     }
 
     /// Adds a constraint to the system.
     pub fn add_constraint(&mut self, constraint: Constraint<F>) {
         self.constraints.push(constraint);
+    }
+
+    /// Adds a constraint to the system.
+    pub fn add_lookup(&mut self, lookup: LookUp) {
+        self.lookups.push(lookup);
     }
 
     /// Returns a null variable to be used as a placeholder
@@ -178,6 +212,14 @@ where
             lro[index] = constraint.l;
             lro[index + n] = constraint.r;
             lro[index + n * 2] = constraint.o;
+        }
+
+        // Add look up columns
+        // TODO: Add padding lookups, they should be the last of the lookups probably.
+        for (index, lookup) in self.lookups.iter().enumerate() {
+            lro[index + n * 3] = lookup.l;
+            lro[index + n * 4] = lookup.r;
+            lro[index + n * 5] = lookup.o;
         }
 
         let mut q = vec![FieldElement::zero(); 5 * n];

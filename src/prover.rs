@@ -40,6 +40,14 @@ pub struct Proof<F: IsField, CS: IsCommitmentScheme<F>> {
     /// Commitment to the wire polynomial `c(x)`
     pub c_1: CS::Commitment,
 
+    // TODO: generalize to n columns
+    /// Commitment to the wire polynomial `d(x)`
+    pub d_1: CS::Commitment,
+    /// Commitment to the wire polynomial `e(x)`
+    pub e_1: CS::Commitment,
+    /// Commitment to the wire polynomial `f(x)`
+    pub f_1: CS::Commitment,
+
     // Round 2.
     /// Commitment to the copy constraints polynomial `z(x)`
     pub z_1: CS::Commitment,
@@ -195,9 +203,13 @@ where
         let (offset, p_non_constant_zeta) = deserialize_field_element(bytes, offset)?;
         let (offset, t_zeta) = deserialize_field_element(bytes, offset)?;
 
+        // TODO: generalize to n columns
         let (offset, a_1) = deserialize_commitment(bytes, offset)?;
         let (offset, b_1) = deserialize_commitment(bytes, offset)?;
         let (offset, c_1) = deserialize_commitment(bytes, offset)?;
+        let (offset, d_1) = deserialize_commitment(bytes, offset)?;
+        let (offset, e_1) = deserialize_commitment(bytes, offset)?;
+        let (offset, f_1) = deserialize_commitment(bytes, offset)?;
         let (offset, z_1) = deserialize_commitment(bytes, offset)?;
         let (offset, t_lo_1) = deserialize_commitment(bytes, offset)?;
         let (offset, t_mid_1) = deserialize_commitment(bytes, offset)?;
@@ -209,6 +221,9 @@ where
             a_1,
             b_1,
             c_1,
+            d_1,
+            e_1,
+            f_1,
             z_1,
             t_lo_1,
             t_mid_1,
@@ -234,12 +249,19 @@ pub struct Prover<F: IsField, CS: IsCommitmentScheme<F>, R: IsRandomFieldElement
 }
 
 struct Round1Result<F: IsField, Hiding> {
+    // TODO: Generalize to n columns
     a_1: Hiding,
     b_1: Hiding,
     c_1: Hiding,
+    d_1: Hiding,
+    e_1: Hiding,
+    f_1: Hiding,
     p_a: Polynomial<FieldElement<F>>,
     p_b: Polynomial<FieldElement<F>>,
     p_c: Polynomial<FieldElement<F>>,
+    p_d: Polynomial<FieldElement<F>>,
+    p_e: Polynomial<FieldElement<F>>,
+    p_f: Polynomial<FieldElement<F>>,
 }
 
 struct Round2Result<F: IsField, Hiding> {
@@ -248,6 +270,8 @@ struct Round2Result<F: IsField, Hiding> {
     beta: FieldElement<F>,
     gamma: FieldElement<F>,
 }
+
+struct LookUpRoundResult;
 
 struct Round3Result<F: IsField, Hiding> {
     t_lo_1: Hiding,
@@ -313,30 +337,51 @@ where
         witness: &Witness<F>,
         common_preprocessed_input: &CommonPreprocessedInput<F>,
     ) -> Round1Result<F, CS::Commitment> {
+        // TODO: should generalize to n columns
         let p_a = Polynomial::interpolate_fft(&witness.a)
             .expect("xs and ys have equal length and xs are unique");
         let p_b = Polynomial::interpolate_fft(&witness.b)
             .expect("xs and ys have equal length and xs are unique");
         let p_c = Polynomial::interpolate_fft(&witness.c)
             .expect("xs and ys have equal length and xs are unique");
+        let p_d = Polynomial::interpolate_fft(&witness.d)
+        .expect("xs and ys have equal length and xs are unique");
+        let p_e = Polynomial::interpolate_fft(&witness.e)
+        .expect("xs and ys have equal length and xs are unique");
+        let p_f = Polynomial::interpolate_fft(&witness.f)
+        .expect("xs and ys have equal length and xs are unique");
 
         let z_h = Polynomial::new_monomial(FieldElement::one(), common_preprocessed_input.n)
             - FieldElement::one();
+        
+        // TODO: should generalize to n columns
         let p_a = self.blind_polynomial(&p_a, &z_h, 2);
         let p_b = self.blind_polynomial(&p_b, &z_h, 2);
         let p_c = self.blind_polynomial(&p_c, &z_h, 2);
+        let p_d = self.blind_polynomial(&p_d, &z_h, 2);
+        let p_e = self.blind_polynomial(&p_e, &z_h, 2);
+        let p_f = self.blind_polynomial(&p_f, &z_h, 2);
 
         let a_1 = self.commitment_scheme.commit(&p_a);
         let b_1 = self.commitment_scheme.commit(&p_b);
         let c_1 = self.commitment_scheme.commit(&p_c);
+        let d_1 = self.commitment_scheme.commit(&p_a);
+        let e_1 = self.commitment_scheme.commit(&p_b);
+        let f_1 = self.commitment_scheme.commit(&p_c);
 
         Round1Result {
             a_1,
             b_1,
             c_1,
+            d_1,
+            e_1,
+            f_1,
             p_a,
             p_b,
             p_c,
+            p_d,
+            p_e,
+            p_f,
         }
     }
 
@@ -349,18 +394,25 @@ where
     ) -> Round2Result<F, CS::Commitment> {
         let cpi = common_preprocessed_input;
         let mut coefficients: Vec<FieldElement<F>> = vec![FieldElement::one()];
-        let (s1, s2, s3) = (&cpi.s1_lagrange, &cpi.s2_lagrange, &cpi.s3_lagrange);
+        // TODO: should generalize to n columns
+        let (s1, s2, s3, s4, s5, s6) = (&cpi.s1_lagrange, &cpi.s2_lagrange, &cpi.s3_lagrange,
+            &cpi.s4_lagrange, &cpi.s5_lagrange, &cpi.s6_lagrange);
 
+        // TODO: need to use k3, k4, .., kn for multiple columns.
         let k2 = &cpi.k1 * &cpi.k1;
 
         let lp = |w: &FieldElement<F>, eta: &FieldElement<F>| w + &beta * eta + &gamma;
 
         for i in 0..&cpi.n - 1 {
-            let (a_i, b_i, c_i) = (&witness.a[i], &witness.b[i], &witness.c[i]);
+            let (a_i, b_i, c_i, d_i, e_i, f_i) = (&witness.a[i], &witness.b[i], &witness.c[i], &witness.d[i], &witness.e[i], &witness.f[i]);
+            // TODO: should generalize to n columns
             let num = lp(a_i, &cpi.domain[i])
                 * lp(b_i, &(&cpi.domain[i] * &cpi.k1))
-                * lp(c_i, &(&cpi.domain[i] * &k2));
-            let den = lp(a_i, &s1[i]) * lp(b_i, &s2[i]) * lp(c_i, &s3[i]);
+                * lp(c_i, &(&cpi.domain[i] * &k2))
+                * lp(d_i, &(&cpi.domain[i] * &k2)) // TODO: need to use k3, k4, .., kn for multiple columns.
+                * lp(e_i, &(&cpi.domain[i] * &k2))
+                * lp(f_i, &(&cpi.domain[i] * &k2));
+            let den = lp(a_i, &s1[i]) * lp(b_i, &s2[i]) * lp(c_i, &s3[i]) * lp(d_i, &s4[i]) * lp(e_i, &s5[i]) * lp(f_i, &s6[i]);
             let new_factor = num / den;
             let new_term = coefficients.last().unwrap() * &new_factor;
             coefficients.push(new_term);
@@ -378,6 +430,13 @@ where
             beta,
             gamma,
         }
+    }
+
+    fn round_lookup_argument(
+        &self,
+        common_preprocessed_input: &CommonPreprocessedInput<F>
+    ) -> LookUpRoundResult {
+        LookUpRoundResult
     }
 
     fn round_3(
@@ -691,6 +750,9 @@ where
             a_1: round_1.a_1,
             b_1: round_1.b_1,
             c_1: round_1.c_1,
+            d_1: round_1.d_1,
+            e_1: round_1.e_1,
+            f_1: round_1.f_1,
             z_1: round_2.z_1,
             t_lo_1: round_3.t_lo_1,
             t_mid_1: round_3.t_mid_1,

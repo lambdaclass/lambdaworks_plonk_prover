@@ -59,7 +59,7 @@ pub fn generate_permutation_coefficients<F: IsField>(
     order_r_minus_1_root_unity: &FieldElement<F>,
 ) -> Vec<FieldElement<F>> {
     let identity = identity_permutation(omega, n, order_r_minus_1_root_unity);
-    let permuted: Vec<FieldElement<F>> = (0..n * 3)
+    let permuted: Vec<FieldElement<F>> = (0..n * 6) // TODO: Should generalize to n columns
         .map(|i| identity[permutation[i]].clone())
         .collect();
     permuted
@@ -73,7 +73,7 @@ fn identity_permutation<F: IsField>(
 ) -> Vec<FieldElement<F>> {
     let u = order_r_minus_1_root_unity;
     let mut result: Vec<FieldElement<F>> = vec![];
-    for index_column in 0..=2 {
+    for index_column in 0..6 { // TODO: Should generalize to n columns
         for index_row in 0..n {
             result.push(w.pow(index_row) * u.pow(index_column as u64));
         }

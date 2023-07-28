@@ -26,13 +26,18 @@ pub fn test_common_preprocessed_input_1() -> CommonPreprocessedInput<FrField> {
     let permuted = generate_permutation_coefficients(
         &omega,
         n,
-        &[11, 3, 0, 1, 2, 4, 6, 10, 5, 8, 7, 9],
+        &[11, 3, 0, 1, 2, 4, 6, 10, 5, 8, 7, 9, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23],
+        // TODO: Add missing permutation for test to pass (Probably could be all additional numbers that don't belong to any cycle
+        // e.g: The identity 
         &ORDER_R_MINUS_1_ROOT_UNITY,
     );
 
     let s1_lagrange: Vec<FrElement> = permuted[..4].to_vec();
     let s2_lagrange: Vec<FrElement> = permuted[4..8].to_vec();
-    let s3_lagrange: Vec<FrElement> = permuted[8..].to_vec();
+    let s3_lagrange: Vec<FrElement> = permuted[8..12].to_vec();
+    let s4_lagrange: Vec<FrElement> = permuted[12..16].to_vec();
+    let s5_lagrange: Vec<FrElement> = permuted[16..20].to_vec();
+    let s6_lagrange: Vec<FrElement> = permuted[20..].to_vec();
 
     CommonPreprocessedInput {
         n,
@@ -83,10 +88,16 @@ pub fn test_common_preprocessed_input_1() -> CommonPreprocessedInput<FrField> {
         s1: Polynomial::interpolate_fft(&s1_lagrange).unwrap(),
         s2: Polynomial::interpolate_fft(&s2_lagrange).unwrap(),
         s3: Polynomial::interpolate_fft(&s3_lagrange).unwrap(),
+        s4: Polynomial::interpolate_fft(&s1_lagrange).unwrap(),
+        s5: Polynomial::interpolate_fft(&s2_lagrange).unwrap(),
+        s6: Polynomial::interpolate_fft(&s3_lagrange).unwrap(),
 
         s1_lagrange,
         s2_lagrange,
         s3_lagrange,
+        s4_lagrange,
+        s5_lagrange,
+        s6_lagrange,
     }
 }
 
@@ -111,6 +122,24 @@ pub fn test_witness_1(x: FrElement, e: FrElement) -> Witness<FrField> {
             empty.clone(),
             &x * &e, // Output of multiplication
             empty,
+        ],
+        d: vec![
+            FrElement::zero(),
+            FrElement::zero(),
+            FrElement::zero(),
+            FrElement::zero(),
+        ],
+        e: vec![
+            FrElement::zero(),
+            FrElement::zero(),
+            FrElement::zero(),
+            FrElement::zero(),
+        ],
+        f: vec![
+            FrElement::one(),
+            FrElement::one(),
+            FrElement::one(),
+            FrElement::one(),
         ],
     }
 }

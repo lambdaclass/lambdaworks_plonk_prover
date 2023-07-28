@@ -13,21 +13,28 @@ use lambdaworks_math::traits::{ByteConversion, Serializable};
 
 // TODO: implement getters
 pub struct Witness<F: IsField> {
+    // TODO: Generalize to n columns
     pub a: Vec<FieldElement<F>>,
     pub b: Vec<FieldElement<F>>,
     pub c: Vec<FieldElement<F>>,
+    pub d: Vec<FieldElement<F>>,
+    pub e: Vec<FieldElement<F>>,
+    pub f: Vec<FieldElement<F>>,
 }
 
 impl<F: IsField> Witness<F> {
     pub fn new(values: HashMap<Variable, FieldElement<F>>, system: &ConstraintSystem<F>) -> Self {
         let (lro, _) = system.to_matrices();
-        let abc: Vec<_> = lro.iter().map(|v| values[v].clone()).collect();
-        let n = lro.len() / 3;
-
+        let abcdef: Vec<_> = lro.iter().map(|v| values[v].clone()).collect();
+        let n = lro.len() / 6;
+        // TODO: Generalize to n columns
         Self {
-            a: abc[..n].to_vec(),
-            b: abc[n..2 * n].to_vec(),
-            c: abc[2 * n..].to_vec(),
+            a: abcdef[..n].to_vec(),
+            b: abcdef[n..2 * n].to_vec(),
+            c: abcdef[2 * n..].to_vec(),
+            d: abcdef[3 * n..4 * n].to_vec(),
+            e: abcdef[4 * n..5 * n].to_vec(),
+            f: abcdef[5 * n..].to_vec()
         }
     }
 }
@@ -46,14 +53,20 @@ pub struct CommonPreprocessedInput<F: IsField> {
     pub qo: Polynomial<FieldElement<F>>,
     pub qm: Polynomial<FieldElement<F>>,
     pub qc: Polynomial<FieldElement<F>>,
-
+// TODO: should generalize to n columns
     pub s1: Polynomial<FieldElement<F>>,
     pub s2: Polynomial<FieldElement<F>>,
     pub s3: Polynomial<FieldElement<F>>,
-
+    pub s4: Polynomial<FieldElement<F>>,
+    pub s5: Polynomial<FieldElement<F>>,
+    pub s6: Polynomial<FieldElement<F>>,
+// TODO: should generalize to n columns
     pub s1_lagrange: Vec<FieldElement<F>>,
     pub s2_lagrange: Vec<FieldElement<F>>,
     pub s3_lagrange: Vec<FieldElement<F>>,
+    pub s4_lagrange: Vec<FieldElement<F>>,
+    pub s5_lagrange: Vec<FieldElement<F>>,
+    pub s6_lagrange: Vec<FieldElement<F>>,
 }
 
 impl<F: IsFFTField> CommonPreprocessedInput<F> {
@@ -62,7 +75,7 @@ impl<F: IsFFTField> CommonPreprocessedInput<F> {
         order_r_minus_1_root_unity: &FieldElement<F>,
     ) -> Self {
         let (lro, q) = system.to_matrices();
-        let n = lro.len() / 3;
+        let n = lro.len() / 6; // TODO: should generalize to n columns
         let omega = F::get_primitive_root_of_unity(n.trailing_zeros() as u64).unwrap();
         let domain = generate_domain(&omega, n);
 
@@ -77,9 +90,13 @@ impl<F: IsFFTField> CommonPreprocessedInput<F> {
         let permuted =
             generate_permutation_coefficients(&omega, n, &permutation, order_r_minus_1_root_unity);
 
+        // TODO: should generalize to n columns
         let s1_lagrange: Vec<_> = permuted[..n].to_vec();
         let s2_lagrange: Vec<_> = permuted[n..2 * n].to_vec();
-        let s3_lagrange: Vec<_> = permuted[2 * n..].to_vec();
+        let s3_lagrange: Vec<_> = permuted[2 * n..3 * n].to_vec();
+        let s4_lagrange: Vec<_> = permuted[3 * n..4 * n].to_vec();
+        let s5_lagrange: Vec<_> = permuted[4 * n..5 * n].to_vec();
+        let s6_lagrange: Vec<_> = permuted[5 * n..].to_vec();
 
         Self {
             domain,
@@ -94,9 +111,15 @@ impl<F: IsFFTField> CommonPreprocessedInput<F> {
             s1: Polynomial::interpolate_fft(&s1_lagrange).unwrap(),
             s2: Polynomial::interpolate_fft(&s2_lagrange).unwrap(),
             s3: Polynomial::interpolate_fft(&s3_lagrange).unwrap(),
+            s4: Polynomial::interpolate_fft(&s4_lagrange).unwrap(),
+            s5: Polynomial::interpolate_fft(&s5_lagrange).unwrap(),
+            s6: Polynomial::interpolate_fft(&s6_lagrange).unwrap(),
             s1_lagrange,
             s2_lagrange,
             s3_lagrange,
+            s4_lagrange,
+            s5_lagrange,
+            s6_lagrange,
         }
     }
 }
@@ -112,6 +135,10 @@ pub struct VerificationKey<G1Point> {
     pub s1_1: G1Point,
     pub s2_1: G1Point,
     pub s3_1: G1Point,
+
+    pub s4_1: G1Point,
+    pub s5_1: G1Point,
+    pub s6_1: G1Point,
 }
 
 #[allow(unused)]
@@ -129,6 +156,10 @@ pub fn setup<F: IsField, CS: IsCommitmentScheme<F>>(
         s1_1: commitment_scheme.commit(&common_input.s1),
         s2_1: commitment_scheme.commit(&common_input.s2),
         s3_1: commitment_scheme.commit(&common_input.s3),
+
+        s4_1: commitment_scheme.commit(&common_input.s4),
+        s5_1: commitment_scheme.commit(&common_input.s5),
+        s6_1: commitment_scheme.commit(&common_input.s6),
     }
 }
 
