@@ -5,7 +5,7 @@ pub mod operations;
 pub mod solver;
 pub mod types;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, marker::PhantomData};
 
 use lambdaworks_math::field::{element::FieldElement, traits::IsField};
 
@@ -43,6 +43,34 @@ pub enum Column {
     O,
 }
 
+#[derive(Clone)]
+pub struct LookUp {
+    l: Variable,
+    r: Variable,
+    o: Variable,
+}
+
+struct LookUpTable<F: IsField> {
+    lookups: Vec<LookUp>,
+    phantom: PhantomData<F>
+}
+
+impl<F: IsField> LookUpTable<F> {
+    fn look_up(a: &FieldElement<F>, b: &FieldElement<F>) -> FieldElement<F> {
+        let zero = &FieldElement::<F>::zero();
+        let one = &FieldElement::<F>::one();
+        if a == one && b == one {
+            FieldElement::zero()
+        } else if a == zero && b == one {
+            FieldElement::one()
+        } else if a == one && b == zero {
+            FieldElement::one()
+        } else {
+            FieldElement::zero()
+        }
+    }
+}
+
 /// A `Hint` is used to insert values to the solver. This is helpful when a
 /// constraint is hard to solve but easy to check.
 #[allow(unused)]
@@ -64,6 +92,7 @@ pub struct ConstraintSystem<F: IsField> {
     num_variables: usize,
     public_input_variables: Vec<Variable>,
     constraints: Vec<Constraint<F>>,
+    lookup_tables: Vec<LookUpTable<F>>
 }
 
 #[allow(unused)]
@@ -77,12 +106,45 @@ where
             num_variables: 0,
             public_input_variables: Vec::new(),
             constraints: Vec::new(),
+            lookup_tables: Vec::new()
         }
+    }
+
+    pub fn number_columns(&self) -> usize  {
+        // Plonk has 3 mandatory columns at the beginning
+        // TODO: Model extra columns of lookup tables.
+        3 + self.lookup_tables.len() * 3
+    }
+
+    pub fn look_up_columns(&self, n_rows: usize) -> Vec<Vec<Variable>> {
+        let mut columns = Vec::<Vec<Variable>>::new(); // TODO: Assumes 3 columns per lookup table
+        for (i, lookup_table) in self.lookup_tables.iter().enumerate() {
+            for j in 0..n_rows {
+                // TODO: Assumes lookup table is not empty.
+                columns[i * 3][j] = lookup_table.lookups[0].l;
+                columns[i * 3 + 1][j] = lookup_table.lookups[0].r;
+                columns[i * 3 + 2][j] = lookup_table.lookups[0].o;
+            }
+        }
+
+        for (i, lookup_table) in self.lookup_tables.iter().enumerate() {
+            for (j, lookup) in lookup_table.lookups.iter().enumerate() {
+                columns[i * 3][j] = lookup.l;
+                columns[i * 3 + 1][j] = lookup.r;
+                columns[i * 3 + 2][j] = lookup.o;
+            }
+        }
+        columns
     }
 
     /// Adds a constraint to the system.
     pub fn add_constraint(&mut self, constraint: Constraint<F>) {
         self.constraints.push(constraint);
+    }
+
+    /// Adds a constraint to the system.
+    pub fn add_lookup(&mut self, lookup: LookUp) {
+        self.lookup_tables[0].lookups.push(lookup);
     }
 
     /// Returns a null variable to be used as a placeholder

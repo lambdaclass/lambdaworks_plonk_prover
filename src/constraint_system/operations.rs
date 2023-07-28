@@ -1,6 +1,6 @@
 use lambdaworks_math::field::{element::FieldElement as FE, traits::IsField};
 
-use super::{Column, Constraint, ConstraintSystem, ConstraintType, Hint, Variable};
+use super::{Column, Constraint, ConstraintSystem, ConstraintType, Hint, Variable, LookUp};
 
 #[allow(unused)]
 impl<F> ConstraintSystem<F>
@@ -189,6 +189,16 @@ where
             r: result,
             o: self.null_variable(),
             hint: None,
+        });
+        result
+    }
+    
+    pub fn xor(&mut self, v: &Variable, w: &Variable) -> Variable {
+        let result = self.new_variable();
+        self.add_lookup(LookUp {
+            l: *v,
+            r: *w,
+            o: result,
         });
         result
     }

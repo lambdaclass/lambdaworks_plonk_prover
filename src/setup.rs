@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::constraint_system::{get_permutation, ConstraintSystem, Variable};
-use crate::test_utils::utils::{generate_domain, generate_permutation_coefficients};
+use crate::test_utils::utils::{generate_domain, generate_permutation_coefficients, generate_permutation_polynomials};
 use lambdaworks_crypto::commitments::traits::IsCommitmentScheme;
 use lambdaworks_crypto::fiat_shamir::default_transcript::DefaultTranscript;
 use lambdaworks_crypto::fiat_shamir::transcript::Transcript;
@@ -13,9 +13,11 @@ use lambdaworks_math::traits::{ByteConversion, Serializable};
 
 // TODO: implement getters
 pub struct Witness<F: IsField> {
+    // TODO: Generalize to n columns
     pub a: Vec<FieldElement<F>>,
     pub b: Vec<FieldElement<F>>,
     pub c: Vec<FieldElement<F>>,
+    pub lookup_columns: Vec<Vec<FieldElement<F>>>
 }
 
 impl<F: IsField> Witness<F> {
@@ -24,10 +26,18 @@ impl<F: IsField> Witness<F> {
         let abc: Vec<_> = lro.iter().map(|v| values[v].clone()).collect();
         let n = lro.len() / 3;
 
+        let mut lookup_columns = Vec::new();
+        for column in system.look_up_columns(n) {
+            let col_assignments: Vec<_> = column.iter().map(|v| values[v].clone()).collect();
+            lookup_columns.push(col_assignments);
+        }
+
+        // TODO: Generalize to n columns
         Self {
             a: abc[..n].to_vec(),
             b: abc[n..2 * n].to_vec(),
             c: abc[2 * n..].to_vec(),
+            lookup_columns: lookup_columns
         }
     }
 }
@@ -35,7 +45,9 @@ impl<F: IsField> Witness<F> {
 // TODO: implement getters
 #[derive(Clone)]
 pub struct CommonPreprocessedInput<F: IsField> {
-    pub n: usize,
+    pub n: usize, // Number rows
+    pub m: usize, // Number columns
+
     /// Number of constraints
     pub domain: Vec<FieldElement<F>>,
     pub omega: FieldElement<F>,
@@ -47,13 +59,8 @@ pub struct CommonPreprocessedInput<F: IsField> {
     pub qm: Polynomial<FieldElement<F>>,
     pub qc: Polynomial<FieldElement<F>>,
 
-    pub s1: Polynomial<FieldElement<F>>,
-    pub s2: Polynomial<FieldElement<F>>,
-    pub s3: Polynomial<FieldElement<F>>,
-
-    pub s1_lagrange: Vec<FieldElement<F>>,
-    pub s2_lagrange: Vec<FieldElement<F>>,
-    pub s3_lagrange: Vec<FieldElement<F>>,
+    pub s_i: Vec<Polynomial<FieldElement<F>>>,
+    pub s_i_lagrange: Vec<Vec<FieldElement<F>>>,
 }
 
 impl<F: IsFFTField> CommonPreprocessedInput<F> {
@@ -62,7 +69,8 @@ impl<F: IsFFTField> CommonPreprocessedInput<F> {
         order_r_minus_1_root_unity: &FieldElement<F>,
     ) -> Self {
         let (lro, q) = system.to_matrices();
-        let n = lro.len() / 3;
+        let number_columns = system.number_columns();
+        let n = lro.len() / number_columns; // TODO: should generalize to n columns
         let omega = F::get_primitive_root_of_unity(n.trailing_zeros() as u64).unwrap();
         let domain = generate_domain(&omega, n);
 
@@ -75,15 +83,14 @@ impl<F: IsFFTField> CommonPreprocessedInput<F> {
 
         let permutation = get_permutation(&lro);
         let permuted =
-            generate_permutation_coefficients(&omega, n, &permutation, order_r_minus_1_root_unity);
-
-        let s1_lagrange: Vec<_> = permuted[..n].to_vec();
-        let s2_lagrange: Vec<_> = permuted[n..2 * n].to_vec();
-        let s3_lagrange: Vec<_> = permuted[2 * n..].to_vec();
+            generate_permutation_coefficients(number_columns, &omega, n, &permutation, order_r_minus_1_root_unity);
+        
+        let (s_i_lagrange, s_i) = generate_permutation_polynomials(number_columns, n, &permuted);
 
         Self {
             domain,
             n,
+            m: number_columns,
             omega,
             k1: order_r_minus_1_root_unity.clone(),
             ql: Polynomial::interpolate_fft(&ql).unwrap(), // TODO: Remove unwraps
@@ -91,12 +98,8 @@ impl<F: IsFFTField> CommonPreprocessedInput<F> {
             qo: Polynomial::interpolate_fft(&qo).unwrap(),
             qm: Polynomial::interpolate_fft(&qm).unwrap(),
             qc: Polynomial::interpolate_fft(&qc).unwrap(),
-            s1: Polynomial::interpolate_fft(&s1_lagrange).unwrap(),
-            s2: Polynomial::interpolate_fft(&s2_lagrange).unwrap(),
-            s3: Polynomial::interpolate_fft(&s3_lagrange).unwrap(),
-            s1_lagrange,
-            s2_lagrange,
-            s3_lagrange,
+            s_i_lagrange: s_i_lagrange,
+            s_i: s_i
         }
     }
 }
@@ -109,9 +112,7 @@ pub struct VerificationKey<G1Point> {
     pub qo_1: G1Point,
     pub qc_1: G1Point,
 
-    pub s1_1: G1Point,
-    pub s2_1: G1Point,
-    pub s3_1: G1Point,
+    pub s_i_1: Vec<G1Point>
 }
 
 #[allow(unused)]
@@ -119,6 +120,10 @@ pub fn setup<F: IsField, CS: IsCommitmentScheme<F>>(
     common_input: &CommonPreprocessedInput<F>,
     commitment_scheme: &CS,
 ) -> VerificationKey<CS::Commitment> {
+    let mut s_i_1 = Vec::new();
+    for s_i in common_input.s_i.iter() {
+        s_i_1.push( commitment_scheme.commit(&s_i));
+    }
     VerificationKey {
         qm_1: commitment_scheme.commit(&common_input.qm),
         ql_1: commitment_scheme.commit(&common_input.ql),
@@ -126,9 +131,7 @@ pub fn setup<F: IsField, CS: IsCommitmentScheme<F>>(
         qo_1: commitment_scheme.commit(&common_input.qo),
         qc_1: commitment_scheme.commit(&common_input.qc),
 
-        s1_1: commitment_scheme.commit(&common_input.s1),
-        s2_1: commitment_scheme.commit(&common_input.s2),
-        s3_1: commitment_scheme.commit(&common_input.s3),
+        s_i_1: s_i_1
     }
 }
 
@@ -144,9 +147,9 @@ where
 {
     let mut transcript = DefaultTranscript::new();
 
-    transcript.append(&vk.s1_1.serialize());
-    transcript.append(&vk.s2_1.serialize());
-    transcript.append(&vk.s3_1.serialize());
+    for s_1 in vk.s_i_1.iter() {
+        transcript.append(&s_1.serialize());
+    }
     transcript.append(&vk.ql_1.serialize());
     transcript.append(&vk.qr_1.serialize());
     transcript.append(&vk.qm_1.serialize());
@@ -213,8 +216,8 @@ mod tests {
         assert_eq!(vk.qo_1, expected_qo);
         assert_eq!(vk.qm_1, expected_qm);
 
-        assert_eq!(vk.s1_1, expected_s1);
-        assert_eq!(vk.s2_1, expected_s2);
-        assert_eq!(vk.s3_1, expected_s3);
+        assert_eq!(vk.s_i_1[0], expected_s1);
+        assert_eq!(vk.s_i_1[1], expected_s2);
+        assert_eq!(vk.s_i_1[2], expected_s3);
     }
 }

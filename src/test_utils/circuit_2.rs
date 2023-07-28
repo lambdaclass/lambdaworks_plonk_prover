@@ -1,5 +1,5 @@
 use super::utils::{
-    generate_domain, generate_permutation_coefficients, ORDER_R_MINUS_1_ROOT_UNITY,
+    generate_domain, generate_permutation_coefficients, ORDER_R_MINUS_1_ROOT_UNITY, generate_permutation_polynomials,
 };
 use crate::setup::{CommonPreprocessedInput, Witness};
 use lambdaworks_math::{
@@ -26,16 +26,16 @@ pub fn test_common_preprocessed_input_2() -> CommonPreprocessedInput<FrField> {
     let domain = generate_domain(&omega, n);
     let permutation = &[
         23, 4, 0, 18, 1, 2, 5, 6, 7, 8, 10, 9, 19, 11, 13, 14, 15, 16, 3, 12, 17, 20, 21, 22,
-    ];
+    ]; // TODO: Add missing permutation for test to pass (Probably could be all additional numbers that don't belong to any cycle
+    // e.g: The identity 
     let permuted =
-        generate_permutation_coefficients(&omega, n, permutation, &ORDER_R_MINUS_1_ROOT_UNITY);
+        generate_permutation_coefficients(3, &omega, n, permutation, &ORDER_R_MINUS_1_ROOT_UNITY);
 
-    let s1_lagrange: Vec<FrElement> = permuted[..8].to_vec();
-    let s2_lagrange: Vec<FrElement> = permuted[8..16].to_vec();
-    let s3_lagrange: Vec<FrElement> = permuted[16..].to_vec();
+    let (s_i_lagrange, s_i) = generate_permutation_polynomials(3, n, &permuted);
 
     CommonPreprocessedInput {
         n,
+        m: 3,
         omega,
         k1: ORDER_R_MINUS_1_ROOT_UNITY,
         domain: domain.clone(),
@@ -111,13 +111,8 @@ pub fn test_common_preprocessed_input_2() -> CommonPreprocessedInput<FrField> {
         )
         .unwrap(),
 
-        s1: Polynomial::interpolate(&domain, &s1_lagrange).unwrap(),
-        s2: Polynomial::interpolate(&domain, &s2_lagrange).unwrap(),
-        s3: Polynomial::interpolate(&domain, &s3_lagrange).unwrap(),
-
-        s1_lagrange,
-        s2_lagrange,
-        s3_lagrange,
+        s_i_lagrange:s_i_lagrange,
+        s_i:s_i
     }
 }
 
@@ -153,5 +148,6 @@ pub fn test_witness_2(x: FrElement, e: FrElement) -> Witness<FrField> {
             x.clone(),
             x,
         ],
+        lookup_columns: Vec::new()
     }
 }

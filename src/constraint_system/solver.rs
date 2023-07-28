@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use lambdaworks_math::field::{element::FieldElement as FE, traits::IsField};
 
-use super::{errors::SolverError, Column, Constraint, ConstraintSystem, Variable};
+use super::{errors::SolverError, Column, Constraint, ConstraintSystem, Variable, LookUp, LookUpTable};
 
 /// Finds a solution to the system extending the `assignments` map. It uses the
 /// simple strategy of going through all the constraints trying to determine an
@@ -24,6 +24,11 @@ where
             for constraint in self.constraints.iter() {
                 assignments = solve_hint(assignments, constraint);
                 assignments = solve_constraint(assignments, constraint);
+            }
+            for lookup_table in self.lookup_tables.iter() {
+                for lookup in lookup_table.lookups.iter() {
+                    assignments = solve_lookup(assignments, lookup);
+                }
             }
             if old_solved == assignments.keys().len() {
                 break;
@@ -49,6 +54,20 @@ where
         }
         Ok(assignments)
     }
+}
+
+fn solve_lookup<F: IsField>(
+    mut assignments: HashMap<Variable, FE<F>>,
+    lookup: &LookUp,
+) -> HashMap<Variable, FE<F>> {
+    let l = assignments.get(&lookup.l);
+    let r = assignments.get(&lookup.r);
+    let o = assignments.get(&lookup.o);
+    match (l, r, o) {
+        (Some(d), Some(e), None) => {assignments.insert(lookup.o, LookUpTable::look_up(&d, &e));}
+        _ => {}
+    }
+    assignments
 }
 
 fn solve_hint<F: IsField>(

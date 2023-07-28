@@ -3,7 +3,10 @@ use lambdaworks_crypto::commitments::kzg::StructuredReferenceString;
 use lambdaworks_math::elliptic_curve::short_weierstrass::curves::bls12_381::default_types::FrElement;
 use lambdaworks_math::elliptic_curve::short_weierstrass::curves::bls12_381::default_types::FrField;
 use lambdaworks_math::elliptic_curve::short_weierstrass::curves::bls12_381::pairing::BLS12381AtePairing;
+use lambdaworks_math::field::traits::IsFFTField;
 use lambdaworks_math::field::traits::IsField;
+use lambdaworks_math::polynomial::Polynomial;
+use lambdaworks_math::fft::polynomial::FFTPoly;
 use lambdaworks_math::{
     cyclic_group::IsGroup,
     elliptic_curve::{
@@ -53,27 +56,43 @@ pub fn generate_domain<F: IsField>(omega: &FieldElement<F>, size: usize) -> Vec<
 /// Generates the permutation coefficients for the copy constraints.
 /// polynomials S1, S2, S3.
 pub fn generate_permutation_coefficients<F: IsField>(
+    number_columns: usize,
     omega: &FieldElement<F>,
     n: usize,
     permutation: &[usize],
     order_r_minus_1_root_unity: &FieldElement<F>,
 ) -> Vec<FieldElement<F>> {
-    let identity = identity_permutation(omega, n, order_r_minus_1_root_unity);
-    let permuted: Vec<FieldElement<F>> = (0..n * 3)
+    let identity = identity_permutation(number_columns, omega, n, order_r_minus_1_root_unity);
+    let permuted: Vec<FieldElement<F>> = (0..n * number_columns) // TODO: Should generalize to n columns
         .map(|i| identity[permutation[i]].clone())
         .collect();
     permuted
 }
 
+pub fn generate_permutation_polynomials<F: IsFFTField>(number_columns: usize, number_rows: usize, permuted: &[FieldElement<F>]) -> (Vec<Vec<FieldElement<F>>>, Vec<Polynomial<FieldElement<F>>>) {
+    let mut s_i_lagrange = Vec::<Vec<FieldElement<F>>>::new();
+    for column in 0..number_columns {
+        s_i_lagrange.push(permuted[(column * number_rows)..((column + 1) * number_rows)].to_vec());
+    }
+
+    let mut s_i = Vec::new();
+    for lagrange in s_i_lagrange.iter() {
+        s_i.push(Polynomial::interpolate_fft(lagrange).unwrap());
+    }
+
+    (s_i_lagrange, s_i)
+}
+
 /// The identity permutation, auxiliary function to generate the copy constraints.
 fn identity_permutation<F: IsField>(
+    number_columns: usize,
     w: &FieldElement<F>,
     n: usize,
     order_r_minus_1_root_unity: &FieldElement<F>,
 ) -> Vec<FieldElement<F>> {
     let u = order_r_minus_1_root_unity;
     let mut result: Vec<FieldElement<F>> = vec![];
-    for index_column in 0..=2 {
+    for index_column in 0..number_columns { // TODO: Should generalize to n columns
         for index_row in 0..n {
             result.push(w.pow(index_row) * u.pow(index_column as u64));
         }

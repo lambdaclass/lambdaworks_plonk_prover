@@ -1,5 +1,5 @@
 use super::utils::{
-    generate_domain, generate_permutation_coefficients, ORDER_R_MINUS_1_ROOT_UNITY,
+    generate_domain, generate_permutation_coefficients, ORDER_R_MINUS_1_ROOT_UNITY, generate_permutation_polynomials,
 };
 use crate::setup::{CommonPreprocessedInput, Witness};
 use lambdaworks_math::fft::polynomial::FFTPoly;
@@ -24,18 +24,20 @@ pub fn test_common_preprocessed_input_1() -> CommonPreprocessedInput<FrField> {
     let omega = FrField::get_primitive_root_of_unity(2).unwrap();
     let domain = generate_domain(&omega, n);
     let permuted = generate_permutation_coefficients(
+        3,
         &omega,
         n,
         &[11, 3, 0, 1, 2, 4, 6, 10, 5, 8, 7, 9],
+        // TODO: Add missing permutation for test to pass (Probably could be all additional numbers that don't belong to any cycle
+        // e.g: The identity 
         &ORDER_R_MINUS_1_ROOT_UNITY,
     );
 
-    let s1_lagrange: Vec<FrElement> = permuted[..4].to_vec();
-    let s2_lagrange: Vec<FrElement> = permuted[4..8].to_vec();
-    let s3_lagrange: Vec<FrElement> = permuted[8..].to_vec();
+    let (s_i_lagrange, s_i) = generate_permutation_polynomials(3, n, &permuted);
 
     CommonPreprocessedInput {
         n,
+        m: 3,
         omega,
         domain,
         k1: ORDER_R_MINUS_1_ROOT_UNITY,
@@ -80,13 +82,8 @@ pub fn test_common_preprocessed_input_1() -> CommonPreprocessedInput<FrField> {
         ])
         .unwrap(),
 
-        s1: Polynomial::interpolate_fft(&s1_lagrange).unwrap(),
-        s2: Polynomial::interpolate_fft(&s2_lagrange).unwrap(),
-        s3: Polynomial::interpolate_fft(&s3_lagrange).unwrap(),
-
-        s1_lagrange,
-        s2_lagrange,
-        s3_lagrange,
+        s_i: s_i,
+        s_i_lagrange: s_i_lagrange
     }
 }
 
@@ -112,5 +109,6 @@ pub fn test_witness_1(x: FrElement, e: FrElement) -> Witness<FrField> {
             &x * &e, // Output of multiplication
             empty,
         ],
+        lookup_columns: Vec::new()
     }
 }
