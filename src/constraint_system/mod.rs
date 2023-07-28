@@ -5,7 +5,7 @@ pub mod operations;
 pub mod solver;
 pub mod types;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, marker::PhantomData};
 
 use lambdaworks_math::field::{element::FieldElement, traits::IsField};
 
@@ -34,6 +34,29 @@ struct ConstraintType<F: IsField> {
     qc: FieldElement<F>,
 }
 
+pub struct XorLookup<F: IsField> {
+    hint: Option<Hint<F>>,
+    l: Variable,
+    r: Variable,
+    o: Variable,
+}
+
+pub struct XorLookupTable<F: IsField> {
+    phantom: PhantomData<F>,
+}
+
+impl<F: IsField> XorLookupTable<F> {
+    pub fn lookup(v: &FieldElement<F>, w: &FieldElement<F>) {
+        // match (*v, *w) {
+        //     (FieldElement::one(), FieldElement::one()) => FieldElement::zero(),
+        //     (FieldElement::zero(), FieldElement::one()) => FieldElement::one(),
+        //     (FieldElement::one(), FieldElement::zero()) => FieldElement::one(),
+        //     (FieldElement::zero(), FieldElement::zero()) => FieldElement::zero(),
+        //     _ => FieldElement::zero(),
+        // }
+    }
+}
+
 /// A `Column` is either `L`, `R` or `O`. It represents the role played by a
 /// variable in a constraint.
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -48,8 +71,8 @@ pub enum Column {
 #[allow(unused)]
 #[derive(Clone)]
 pub struct Hint<F: IsField> {
-    function: fn(&FieldElement<F>) -> FieldElement<F>,
-    input: Column,
+    function: fn(&[FieldElement<F>]) -> FieldElement<F>,
+    input: Vec<Column>,
     output: Column,
 }
 
@@ -64,6 +87,7 @@ pub struct ConstraintSystem<F: IsField> {
     num_variables: usize,
     public_input_variables: Vec<Variable>,
     constraints: Vec<Constraint<F>>,
+    lookups: Vec<XorLookup<F>>,
 }
 
 #[allow(unused)]
@@ -77,12 +101,18 @@ where
             num_variables: 0,
             public_input_variables: Vec::new(),
             constraints: Vec::new(),
+            lookups: Vec::new(),
         }
     }
 
     /// Adds a constraint to the system.
     pub fn add_constraint(&mut self, constraint: Constraint<F>) {
         self.constraints.push(constraint);
+    }
+
+    /// Adds a constraint to the system.
+    pub fn add_lookup(&mut self, lookup: XorLookup<F>) {
+        self.lookups.push(lookup);
     }
 
     /// Returns a null variable to be used as a placeholder

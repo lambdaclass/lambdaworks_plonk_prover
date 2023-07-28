@@ -192,6 +192,13 @@ where
         });
         result
     }
+
+    pub fn xor(&mut self, v: &Variable, w: &Variable)  {
+        let result = self.new_variable();
+        // self.add_lookup(
+        //     super::XorLookup { l: v, r: w, o: result, hint:  }
+        // )
+    }
 }
 
 #[cfg(test)]
