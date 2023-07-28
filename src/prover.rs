@@ -41,7 +41,7 @@ pub struct Proof<F: IsField, CS: IsCommitmentScheme<F>> {
     pub c_1: CS::Commitment,
 
     /// Commitments of extra wires for lookup tables
-    pub lookup_columns_1 : Vec<CS::Commitment>,
+    pub lookup_columns_1: Vec<CS::Commitment>,
 
     // Round 2.
     /// Commitment to the copy constraints polynomial `z(x)`
@@ -250,7 +250,7 @@ struct Round1Result<F: IsField, Hiding> {
     p_b: Polynomial<FieldElement<F>>,
     p_c: Polynomial<FieldElement<F>>,
 
-    p_lookup_columns: Vec<Polynomial<FieldElement<F>>>
+    p_lookup_columns: Vec<Polynomial<FieldElement<F>>>,
 }
 
 struct Round2Result<F: IsField, Hiding> {
@@ -341,7 +341,7 @@ where
 
         let z_h = Polynomial::new_monomial(FieldElement::one(), common_preprocessed_input.n)
             - FieldElement::one();
-        
+
         let p_a = self.blind_polynomial(&p_a, &z_h, 2);
         let p_b = self.blind_polynomial(&p_b, &z_h, 2);
         let p_c = self.blind_polynomial(&p_c, &z_h, 2);
@@ -350,7 +350,7 @@ where
         for p_lookup_column in p_lookup_columns.iter() {
             p_blinded_lookup_columns.push(self.blind_polynomial(p_lookup_column, &z_h, 2));
         }
-        
+
         let a_1 = self.commitment_scheme.commit(&p_a);
         let b_1 = self.commitment_scheme.commit(&p_b);
         let c_1 = self.commitment_scheme.commit(&p_c);
@@ -368,7 +368,7 @@ where
             p_a,
             p_b,
             p_c,
-            p_lookup_columns
+            p_lookup_columns,
         }
     }
 
@@ -382,21 +382,39 @@ where
         let cpi = common_preprocessed_input;
         let mut coefficients: Vec<FieldElement<F>> = vec![FieldElement::one()];
         // TODO: has fixed index
-        let (s1, s2, s3) = (&cpi.s_i_lagrange[0], &cpi.s_i_lagrange[1], &cpi.s_i_lagrange[2]);
+        let (s1, s2, s3) = (
+            &cpi.s_i_lagrange[0],
+            &cpi.s_i_lagrange[1],
+            &cpi.s_i_lagrange[2],
+        );
 
-        // TODO: need to use k3, k4, .., kn for multiple columns.
-        let k2 = &cpi.k1 * &cpi.k1;
+        let k_powers: Vec<_> = std::iter::successors(Some(cpi.k1.clone()), |x| Some(x * &cpi.k1))
+            .take(3 + witness.lookup_columns.len())
+            .collect();
 
         let lp = |w: &FieldElement<F>, eta: &FieldElement<F>| w + &beta * eta + &gamma;
 
+        // TODO: Use successors to compute coefficients.
         for i in 0..&cpi.n - 1 {
             let (a_i, b_i, c_i) = (&witness.a[i], &witness.b[i], &witness.c[i]);
-            // TODO: should generalize to n columns
-            let num = lp(a_i, &cpi.domain[i])
-                * lp(b_i, &(&cpi.domain[i] * &cpi.k1))
-                * lp(c_i, &(&cpi.domain[i] * &k2));// TODO: need to use k3, k4, .., kn for multiple columns.
+            let mut num = lp(a_i, &cpi.domain[i])
+                * lp(b_i, &(&cpi.domain[i] * &k_powers[0]))
+                * lp(c_i, &(&cpi.domain[i] * &k_powers[1]));
 
-            let den = lp(a_i, &s1[i]) * lp(b_i, &s2[i]) * lp(c_i, &s3[i]);
+            for (i, lookup_column) in witness.lookup_columns.iter().enumerate() {
+                num = num * lp(&lookup_column[i], &(&cpi.domain[i] * &k_powers[3 + i]))
+            }
+
+            let mut den = lp(a_i, &s1[i]) * lp(b_i, &s2[i]) * lp(c_i, &s3[i]);
+
+            for (lookup_column, s_i) in witness
+                .lookup_columns
+                .iter()
+                .zip(cpi.s_i_lagrange.iter().skip(3))
+            {
+                den = den * lp(&lookup_column[i], &s_i[i]);
+            }
+
             let new_factor = num / den;
             let new_term = coefficients.last().unwrap() * &new_factor;
             coefficients.push(new_term);
@@ -406,7 +424,10 @@ where
             .expect("xs and ys have equal length and xs are unique");
         let z_h = Polynomial::new_monomial(FieldElement::one(), common_preprocessed_input.n)
             - FieldElement::one();
+
+        // TODO: Check 3 is sensible for lookup
         let p_z = self.blind_polynomial(&p_z, &z_h, 3);
+        // columns
         let z_1 = self.commitment_scheme.commit(&p_z);
         Round2Result {
             z_1,
@@ -418,7 +439,7 @@ where
 
     fn round_lookup_argument(
         &self,
-        common_preprocessed_input: &CommonPreprocessedInput<F>
+        common_preprocessed_input: &CommonPreprocessedInput<F>,
     ) -> LookUpRoundResult {
         LookUpRoundResult
     }
@@ -477,9 +498,15 @@ where
             .evaluate_offset_fft(1, Some(degree), offset)
             .unwrap();
         // TODO: has fixed index
-        let p_s1_eval = cpi.s_i[0].evaluate_offset_fft(1, Some(degree), offset).unwrap();
-        let p_s2_eval = cpi.s_i[1].evaluate_offset_fft(1, Some(degree), offset).unwrap();
-        let p_s3_eval = cpi.s_i[2].evaluate_offset_fft(1, Some(degree), offset).unwrap();
+        let p_s1_eval = cpi.s_i[0]
+            .evaluate_offset_fft(1, Some(degree), offset)
+            .unwrap();
+        let p_s2_eval = cpi.s_i[1]
+            .evaluate_offset_fft(1, Some(degree), offset)
+            .unwrap();
+        let p_s3_eval = cpi.s_i[2]
+            .evaluate_offset_fft(1, Some(degree), offset)
+            .unwrap();
         let l1_eval = l1.evaluate_offset_fft(1, Some(degree), offset).unwrap();
 
         let p_constraints_eval: Vec<_> = p_a_eval
