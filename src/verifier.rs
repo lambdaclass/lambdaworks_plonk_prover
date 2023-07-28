@@ -151,7 +151,7 @@ impl<F: IsField + IsFFTField, CS: IsCommitmentScheme<F>> Verifier<F, CS> {
         let second_term = p
             .z_1
             .operate_with_self(z_coefficient.representative())
-            .operate_with(&vk.s3_1.operate_with_self(s3_coefficient.representative()))
+            .operate_with(&vk.s_i_1[2].operate_with_self(s3_coefficient.representative())) // TODO: has fixed index
             .operate_with_self(alpha.representative());
         // α²*L₁(ζ)*Z(X)
         let third_term = p
@@ -177,8 +177,8 @@ impl<F: IsField + IsFFTField, CS: IsCommitmentScheme<F>> Verifier<F, CS> {
             p.a_1.clone(),
             p.b_1.clone(),
             p.c_1.clone(),
-            vk.s1_1.clone(),
-            vk.s2_1.clone(),
+            vk.s_i_1[0].clone(), // TODO: has fixed index
+            vk.s_i_1[1].clone(),
         ];
         let batch_openings_check =
             self.commitment_scheme

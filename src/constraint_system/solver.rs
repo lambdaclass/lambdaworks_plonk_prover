@@ -25,8 +25,10 @@ where
                 assignments = solve_hint(assignments, constraint);
                 assignments = solve_constraint(assignments, constraint);
             }
-            for lookup in self.lookups.iter() {
-                assignments = solve_lookup(assignments, lookup);
+            for lookup_table in self.lookup_tables.iter() {
+                for lookup in lookup_table.lookups.iter() {
+                    assignments = solve_lookup(assignments, lookup);
+                }
             }
             if old_solved == assignments.keys().len() {
                 break;

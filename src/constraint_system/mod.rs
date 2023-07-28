@@ -51,6 +51,7 @@ pub struct LookUp {
 }
 
 struct LookUpTable<F: IsField> {
+    lookups: Vec<LookUp>,
     phantom: PhantomData<F>
 }
 
@@ -91,7 +92,7 @@ pub struct ConstraintSystem<F: IsField> {
     num_variables: usize,
     public_input_variables: Vec<Variable>,
     constraints: Vec<Constraint<F>>,
-    lookups: Vec<LookUp>
+    lookup_tables: Vec<LookUpTable<F>>
 }
 
 #[allow(unused)]
@@ -105,8 +106,35 @@ where
             num_variables: 0,
             public_input_variables: Vec::new(),
             constraints: Vec::new(),
-            lookups: Vec::new()
+            lookup_tables: Vec::new()
         }
+    }
+
+    pub fn number_columns(&self) -> usize  {
+        // Plonk has 3 mandatory columns at the beginning
+        // TODO: Model extra columns of lookup tables.
+        3 + self.lookup_tables.len() * 3
+    }
+
+    pub fn look_up_columns(&self, n_rows: usize) -> Vec<Vec<Variable>> {
+        let mut columns = Vec::<Vec<Variable>>::new(); // TODO: Assumes 3 columns per lookup table
+        for (i, lookup_table) in self.lookup_tables.iter().enumerate() {
+            for j in 0..n_rows {
+                // TODO: Assumes lookup table is not empty.
+                columns[i * 3][j] = lookup_table.lookups[0].l;
+                columns[i * 3 + 1][j] = lookup_table.lookups[0].r;
+                columns[i * 3 + 2][j] = lookup_table.lookups[0].o;
+            }
+        }
+
+        for (i, lookup_table) in self.lookup_tables.iter().enumerate() {
+            for (j, lookup) in lookup_table.lookups.iter().enumerate() {
+                columns[i * 3][j] = lookup.l;
+                columns[i * 3 + 1][j] = lookup.r;
+                columns[i * 3 + 2][j] = lookup.o;
+            }
+        }
+        columns
     }
 
     /// Adds a constraint to the system.
@@ -116,7 +144,7 @@ where
 
     /// Adds a constraint to the system.
     pub fn add_lookup(&mut self, lookup: LookUp) {
-        self.lookups.push(lookup);
+        self.lookup_tables[0].lookups.push(lookup);
     }
 
     /// Returns a null variable to be used as a placeholder
@@ -212,14 +240,6 @@ where
             lro[index] = constraint.l;
             lro[index + n] = constraint.r;
             lro[index + n * 2] = constraint.o;
-        }
-
-        // Add look up columns
-        // TODO: Add padding lookups, they should be the last of the lookups probably.
-        for (index, lookup) in self.lookups.iter().enumerate() {
-            lro[index + n * 3] = lookup.l;
-            lro[index + n * 4] = lookup.r;
-            lro[index + n * 5] = lookup.o;
         }
 
         let mut q = vec![FieldElement::zero(); 5 * n];

@@ -1,5 +1,5 @@
 use super::utils::{
-    generate_domain, generate_permutation_coefficients, ORDER_R_MINUS_1_ROOT_UNITY,
+    generate_domain, generate_permutation_coefficients, ORDER_R_MINUS_1_ROOT_UNITY, generate_permutation_polynomials,
 };
 use crate::setup::{CommonPreprocessedInput, Witness};
 use lambdaworks_math::fft::polynomial::FFTPoly;
@@ -41,6 +41,7 @@ pub fn common_preprocessed_input_from_json(
     let omega = FrField::get_primitive_root_of_unity(n.trailing_zeros() as u64).unwrap();
     let domain = generate_domain(&omega, n);
     let permuted = generate_permutation_coefficients(
+        3,
         &omega,
         n,
         &json_input.Permutation,
@@ -50,24 +51,18 @@ pub fn common_preprocessed_input_from_json(
 
     let pad = FrElement::from_hex_unchecked(&json_input.Input[0]);
 
-    let s1_lagrange: Vec<FrElement> = permuted[..n].to_vec();
-    let s2_lagrange: Vec<FrElement> = permuted[n..2 * n].to_vec();
-    let s3_lagrange: Vec<FrElement> = permuted[2 * n..3*n].to_vec();
-    let s4_lagrange: Vec<FrElement> = permuted[3 * n..4*n].to_vec();
-    let s5_lagrange: Vec<FrElement> = permuted[4 * n..5*n].to_vec();
-    let s6_lagrange: Vec<FrElement> = permuted[5 * n..].to_vec();
+    let (s_i_lagrange, s_i) = generate_permutation_polynomials(3, n, &permuted);
 
     (
         Witness {
             a: process_vector(json_input.A, &pad, n),
             b: process_vector(json_input.B, &pad, n),
             c: process_vector(json_input.C, &pad, n),
-            d: vec![FrElement::zero(); n],
-            e: vec![FrElement::zero(); n],
-            f: vec![FrElement::one(); n],
+            lookup_columns: Vec::new()
         },
         CommonPreprocessedInput {
             n,
+            m: 3,
             domain,
             omega,
             k1: ORDER_R_MINUS_1_ROOT_UNITY,
@@ -81,18 +76,8 @@ pub fn common_preprocessed_input_from_json(
                 .unwrap(),
             qc: Polynomial::interpolate_fft(&process_vector(json_input.Qc, &FrElement::zero(), n))
                 .unwrap(),
-            s1: Polynomial::interpolate_fft(&s1_lagrange).unwrap(),
-            s2: Polynomial::interpolate_fft(&s2_lagrange).unwrap(),
-            s3: Polynomial::interpolate_fft(&s3_lagrange).unwrap(),
-            s4: Polynomial::interpolate_fft(&s4_lagrange).unwrap(),
-            s5: Polynomial::interpolate_fft(&s5_lagrange).unwrap(),
-            s6: Polynomial::interpolate_fft(&s6_lagrange).unwrap(),
-            s1_lagrange,
-            s2_lagrange,
-            s3_lagrange,
-            s4_lagrange,
-            s5_lagrange,
-            s6_lagrange,
+                s_i_lagrange:s_i_lagrange,
+                s_i: s_i
         },
         convert_str_vec_to_frelement_vec(json_input.Input),
     )
