@@ -436,9 +436,9 @@ Finally both conditions (a) and (b) are equivalent to a single equation (c) if w
 (c) Let $\alpha$ be a random field element. There is a polynomial $t$ such that
 $$
 \begin{aligned}
-z_H t &= a q_L + b q_R + a b q_M + c q_O + q_C + pi + \\
-      &= \alpha(gz' - fz) \\
-      &= \alpha^2(z-1)L_1 \\
+z_H t = &a q_L + b q_R + a b q_M + c q_O + q_C + pi \\
+        &+ \alpha(gz' - fz) \\
+        &+ \alpha^2(z-1)L_1 \\
 \end{aligned}
 $$
 
