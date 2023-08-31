@@ -2,7 +2,6 @@ use lambdaworks_math::field::{element::FieldElement, traits::IsField};
 
 use super::{Constraint, ConstraintSystem, ConstraintType, Variable};
 
-#[allow(unused)]
 impl<F> ConstraintSystem<F>
 where
     F: IsField,

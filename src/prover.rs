@@ -30,7 +30,6 @@ use lambdaworks_math::{field::traits::IsField, traits::ByteConversion};
 /// `p_non_constant` is the sum of all the terms with a "non-constant"
 /// polynomial factor, such as `b(ζ)Q_R(X)`, and `p_constant` is the
 /// sum of all the rest (such as `PI(ζ)`).
-#[allow(unused)]
 pub struct Proof<F: IsField, CS: IsCommitmentScheme<F>> {
     // Round 1.
     /// Commitment to the wire polynomial `a(x)`
@@ -284,7 +283,6 @@ where
     CS::Commitment: Serializable,
     R: IsRandomFieldElementGenerator<F>,
 {
-    #[allow(unused)]
     pub fn new(commitment_scheme: CS, random_generator: R) -> Self {
         Self {
             commitment_scheme,
@@ -628,7 +626,6 @@ where
         }
     }
 
-    #[allow(unused)]
     pub fn prove(
         &self,
         witness: &Witness<F>,

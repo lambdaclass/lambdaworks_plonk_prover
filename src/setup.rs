@@ -101,7 +101,6 @@ impl<F: IsFFTField> CommonPreprocessedInput<F> {
     }
 }
 
-#[allow(unused)]
 pub struct VerificationKey<G1Point> {
     pub qm_1: G1Point,
     pub ql_1: G1Point,
@@ -114,7 +113,6 @@ pub struct VerificationKey<G1Point> {
     pub s3_1: G1Point,
 }
 
-#[allow(unused)]
 pub fn setup<F: IsField, CS: IsCommitmentScheme<F>>(
     common_input: &CommonPreprocessedInput<F>,
     commitment_scheme: &CS,

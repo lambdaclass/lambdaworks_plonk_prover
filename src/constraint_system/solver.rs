@@ -10,7 +10,6 @@ use super::{errors::SolverError, Column, Constraint, ConstraintSystem, Variable}
 /// through every constraint and there's nothing else to be solved this way.
 /// It returns an error in case there is no such solution or in case this strategy
 /// is not enough.
-#[allow(unused)]
 impl<F> ConstraintSystem<F>
 where
     F: IsField,
@@ -18,7 +17,7 @@ where
     pub fn solve(
         &self,
         mut assignments: HashMap<Variable, FE<F>>,
-    ) -> Result<(HashMap<Variable, FE<F>>), SolverError> {
+    ) -> Result<HashMap<Variable, FE<F>>, SolverError> {
         loop {
             let old_solved = assignments.keys().len();
             for constraint in self.constraints.iter() {

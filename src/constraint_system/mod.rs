@@ -13,7 +13,6 @@ use lambdaworks_math::field::{element::FieldElement, traits::IsField};
 /// represents (Q_L, Q_R, Q_M, Q_O, Q_C), then the constraint enforces that
 /// `a Q_L + b Q_R + a b Q_M + c Q_O + Q_C = 0` where `a`, `b`, and `c` are the
 /// values taken by the variables `l`, `r` and `o` respectively.
-#[allow(unused)]
 #[derive(Clone)]
 pub struct Constraint<F: IsField> {
     constraint_type: ConstraintType<F>,
@@ -45,7 +44,6 @@ pub enum Column {
 
 /// A `Hint` is used to insert values to the solver. This is helpful when a
 /// constraint is hard to solve but easy to check.
-#[allow(unused)]
 #[derive(Clone)]
 pub struct Hint<F: IsField> {
     function: fn(&FieldElement<F>) -> FieldElement<F>,
@@ -54,19 +52,16 @@ pub struct Hint<F: IsField> {
 }
 
 /// Represents a variable as an ID.
-#[allow(unused)]
 pub type Variable = usize;
 
 /// A collection of variables and constraints that encodes correct executions
 /// of a program. Variables can be of two types: Public or private.
-#[allow(unused)]
 pub struct ConstraintSystem<F: IsField> {
     num_variables: usize,
     public_input_variables: Vec<Variable>,
     constraints: Vec<Constraint<F>>,
 }
 
-#[allow(unused)]
 impl<F> ConstraintSystem<F>
 where
     F: IsField,
@@ -194,7 +189,7 @@ where
 
     /// This method filters the `values` hashmap to return the list of values
     /// corresponding to the public variables
-    fn public_input_values(
+    pub fn public_input_values(
         &self,
         values: &HashMap<Variable, FieldElement<F>>,
     ) -> Vec<FieldElement<F>> {

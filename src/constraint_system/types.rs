@@ -5,7 +5,6 @@ use lambdaworks_math::field::{
 
 use super::{Column, Constraint, ConstraintSystem, ConstraintType, Hint, Variable};
 
-#[allow(unused)]
 impl<F> ConstraintSystem<F>
 where
     F: IsField,
