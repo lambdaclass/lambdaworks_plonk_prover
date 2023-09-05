@@ -1,6 +1,6 @@
 # Lambdaworks Plonk Prover
 
-This repo is now deprecated. Plonk has been moved to the main [Lambdaworks](https://github.com/lambdaclass/lambdaworks)repository.
+This repo is now deprecated. Plonk has been moved to the main [Lambdaworks](https://github.com/lambdaclass/lambdaworks) repository.
 
 <div>
 
